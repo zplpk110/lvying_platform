@@ -81,6 +81,31 @@ export const constantRoutes = [
     meta: { title: '锁定屏幕' }
   },
   {
+    path: '/lvying',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'tour/detail/:tourId(\\d+)',
+        component: () => import('@/views/lvying/tour/detail'),
+        name: 'LvYingTourDetail',
+        meta: { title: '团详情中心' }
+      },
+      {
+        path: 'reimburse',
+        component: () => import('@/views/lvying/reimburse/index'),
+        name: 'LvYingReimburse',
+        meta: { title: '极速报销中心' }
+      },
+      {
+        path: 'collection',
+        component: () => import('@/views/lvying/collection/index'),
+        name: 'LvYingCollection',
+        meta: { title: '智能催收助手' }
+      }
+    ]
+  },
+  {
     path: '/user',
     component: Layout,
     hidden: true,
