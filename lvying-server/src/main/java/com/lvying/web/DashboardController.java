@@ -7,6 +7,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+/** 老板/业务员首页聚合数据。 */
 @RestController
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor

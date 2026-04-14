@@ -10,6 +10,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+/**
+ * 开发/演示用种子数据：仅在用户表为空时插入老板、业务员与示例团（与前端演示账号一致）。
+ *
+ * <p>生产环境可关闭或改为 Flyway 迁移脚本。
+ */
 @Configuration
 @RequiredArgsConstructor
 public class DataInitializer {
@@ -24,6 +29,7 @@ public class DataInitializer {
   @Bean
   CommandLineRunner seed() {
     return args -> {
+      // 已有用户则跳过，避免重复执行主类时主键/唯一约束冲突
       if (userRepository.count() > 0) return;
       User boss =
           userRepository.save(

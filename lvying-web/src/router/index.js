@@ -1,3 +1,6 @@
+/**
+ * 路由：Hash 模式便于静态部署；除 login 外需 token（守卫内检查）。
+ */
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 

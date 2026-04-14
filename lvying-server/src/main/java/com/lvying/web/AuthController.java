@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+/** 认证：登录获取 JWT，无状态接口不建 Session。 */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor

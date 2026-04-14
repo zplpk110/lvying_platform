@@ -12,6 +12,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 团期 REST：列表、新建、详情、记收款、加游客、封团、记支出（支出逻辑在 {@link com.lvying.service.ExpenseService}）。
+ */
 @RestController
 @RequestMapping("/api/tours")
 @RequiredArgsConstructor

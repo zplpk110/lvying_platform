@@ -5,6 +5,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+/**
+ * 团详情 API模型：基本信息 + {@link Finance}（收银台/成本夹/结算卡所需金额均为字符串，避免 JSON 丢精度）。
+ */
 public record TourDetailResponse(
     UUID id,
     String tourCode,
@@ -19,6 +22,7 @@ public record TourDetailResponse(
     BigDecimal commissionRate,
     Finance finance) {
 
+  /** 与 PRD 三栏对应的聚合金额（单位：元，十进制字符串）。 */
   public record Finance(
       String totalReceivable,
       String incomeReceived,

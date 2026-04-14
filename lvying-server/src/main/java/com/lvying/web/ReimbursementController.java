@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+/** 报销审批、月结导出、批量标记已打款（仅老板）。 */
 @RestController
 @RequestMapping("/api/reimbursements")
 @RequiredArgsConstructor

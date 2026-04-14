@@ -1,3 +1,4 @@
+# 旅盈后端默认配置（本地开发）；生产请用环境变量覆盖密码与 JWT 密钥。
 server:
   port: 8080
 
@@ -5,12 +6,14 @@ spring:
   application:
     name: lvying-server
   datasource:
+    # 库名 lvying_dev；若库不存在可依赖 createDatabaseIfNotExist（需账号有建库权限）
     url: jdbc:mysql://localhost:3306/lvying_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
     username: root
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
+      # 开发期自动建表/改表；上线建议改为 validate + Flyway
       ddl-auto: update
     show-sql: false
     properties:
@@ -19,6 +22,8 @@ spring:
 
 lvying:
   jwt:
+    # HS256 密钥，须足够长；生产务必 JWT_SECRET 环境变量覆盖
     secret: ${JWT_SECRET:lvying-dev-secret-change-me-min-32-chars-long!!}
     expiration-ms: 604800000
+  # 老板「可用余额」中额外扣减的安全垫（元），默认 0
   reserved-safe-cash: ${RESERVED_SAFE_CASH:0}

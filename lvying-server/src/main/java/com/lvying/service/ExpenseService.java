@@ -13,6 +13,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 记支出/报销：公账即时入账为已付；员工垫付走审批与打款状态机。
+ *
+ * <p>超支时抛出 {@link com.lvying.web.error.BusinessException}，{@code code=OVERSPEND_GUARD}，老板需在请求中带 {@code
+ * bossConfirmed=true} 二次确认。
+ */
 @Service
 @RequiredArgsConstructor
 public class ExpenseService {
@@ -22,6 +28,11 @@ public class ExpenseService {
   private final UserRepository userRepository;
   private final FundService fundService;
 
+  /**
+   * 创建支出记录并落库。
+   *
+   * @param user 当前登录人；公账时作为审批人记一笔，员工垫付为待审。
+   */
   @Transactional
   public void create(UUID tourId, CreateExpenseRequest req, AppUserDetails user) {
     Tour tour =

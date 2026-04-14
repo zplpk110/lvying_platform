@@ -10,6 +10,9 @@ import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 
+/**
+ * JWT签发与解析：subject 为用户 UUID，自定义 claims 含手机号与角色，供 {@link com.lvying.security.JwtAuthFilter} 还原登录态。
+ */
 @Service
 public class JwtService {
 
@@ -28,6 +31,7 @@ public class JwtService {
     return Keys.hmacShaKeyFor(s.getBytes(StandardCharsets.UTF_8));
   }
 
+  /** 生成 HS256 签名 Token，默认有效期见配置 {@code lvying.jwt.expiration-ms}。 */
   public String createToken(UUID userId, String phone, UserRole role) {
     long exp = props.getJwt().getExpirationMs();
     Date now = new Date();
@@ -41,6 +45,7 @@ public class JwtService {
         .compact();
   }
 
+  /** 校验签名并解析声明；非法 Token 由调用方捕获。 */
   public Claims parse(String token) {
     return Jwts.parser().verifyWith(key()).build().parseSignedClaims(token).getPayload();
   }

@@ -15,6 +15,10 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * 从 {@code Authorization: Bearer} 解析 JWT，校验后把 {@link AppUserDetails} 放入 {@link
+ * org.springframework.security.core.context.SecurityContext}。
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {

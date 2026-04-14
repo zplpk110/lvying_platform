@@ -5,6 +5,11 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
+/**
+ * 催收动作留痕（表 {@code collection_reminders}）。
+ *
+ * <p>MVP 仅写入系统，{@code channel} 如 {@code SMS_STUB} 表示未接真实短信网关；后续可对接运营商/企微。
+ */
 @Entity
 @Table(name = "collection_reminders")
 @Getter

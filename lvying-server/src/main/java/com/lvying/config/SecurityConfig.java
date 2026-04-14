@@ -23,6 +23,12 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+/**
+ * 安全栈：无 Session、JWT 过滤器、除登录外均需认证；CORS 放行本地前端开发端口。
+ *
+ * <p>方法级权限使用 {@link org.springframework.security.access.prepost.PreAuthorize}（{@code hasRole} 与业务枚举 {@link
+ * com.lvying.domain.UserRole} 对应，Spring 自动加 {@code ROLE_} 前缀）。
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity

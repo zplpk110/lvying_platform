@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/** 用户：登录按手机号；垫付人下拉按角色查业务员。 */
 public interface UserRepository extends JpaRepository<User, UUID> {
   Optional<User> findByPhone(String phone);
 

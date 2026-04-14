@@ -1,3 +1,6 @@
+/**
+ * Axios 实例：基址 /api 由 Vite 代理到后端；请求自动带 JWT，401 时清空登录态。
+ */
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 

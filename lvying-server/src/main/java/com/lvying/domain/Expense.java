@@ -6,6 +6,18 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
+/**
+ * 支出 / 报销单行（表 {@code expenses}），对应 PRD「记一笔支出」。
+ *
+ * <p><b>资金状态（与 PRD 对齐）</b>
+ * <ul>
+ *   <li><b>已付成本（Paid_Cost）</b>：{@link PaymentMethod#COMPANY_ACCOUNT} 入账即视同已付；或员工垫付且 {@link
+ *       ExpensePayStatus#PAID}。
+ *   <li><b>待付成本（Pending_Cost）</b>：员工垫付、{@link ExpenseApprovalStatus#APPROVED} 且尚未打款（{@link
+ *       ExpensePayStatus#UNPAID}），计入老板「可用余额」扣减项。
+ *   <li>未审批的垫付不计入 Pending_Cost，但计入团维度「待报销/成本预估」用于超支判断。
+ * </ul>
+ */
 @Entity
 @Table(name = "expenses")
 @Getter

@@ -6,6 +6,11 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
+/**
+ * 团内游客（表 {@code tour_guests}），用于尾款催收名单与短信话术中的脱敏展示。
+ *
+ * <p>{@code phoneMasked} 给界面与日志使用；{@code phoneRaw} 可存真实号（注意隐私合规）。{@code balanceDue} 为该游客维度欠尾款，可与团总欠联动。
+ */
 @Entity
 @Table(name = "tour_guests")
 @Getter

@@ -10,6 +10,10 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+/**
+ * 登录主体：封装用户 id、手机号、角色与权限（{@code ROLE_BOSS_FINANCE} / {@code ROLE_SALES_GUIDE}），供控制器 {@link
+ * org.springframework.security.core.annotation.AuthenticationPrincipal} 注入。
+ */
 @Getter
 @RequiredArgsConstructor
 public class AppUserDetails implements UserDetails {

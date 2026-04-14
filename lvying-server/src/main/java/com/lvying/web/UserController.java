@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+/** 用户辅助接口：如记支出时「垫付人」下拉列表。 */
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor

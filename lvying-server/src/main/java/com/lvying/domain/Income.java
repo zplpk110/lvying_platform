@@ -6,6 +6,11 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
+/**
+ * 实收流水（表 {@code incomes}），对应 PRD 的 Actual_Income：老板侧已确认到账的团款。
+ *
+ * <p>MVP 中创建记录即视为已入账；{@link IncomeType} 区分定金、尾款等，便于团详情「收银台」分项展示。
+ */
 @Entity
 @Table(name = "incomes")
 @Getter

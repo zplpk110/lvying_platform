@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/** 实收流水汇总：全库或按团、按收款类型求和。 */
 public interface IncomeRepository extends JpaRepository<Income, UUID> {
 
   @Query("SELECT COALESCE(SUM(i.amount), 0) FROM Income i")

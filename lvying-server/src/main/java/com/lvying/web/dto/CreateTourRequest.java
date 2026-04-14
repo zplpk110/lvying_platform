@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+/** 新建团期请求体；红线可显式传或按毛利率/默认75% 成本上限推算。 */
 public record CreateTourRequest(
     @NotBlank String tourCode,
     @NotBlank String name,

@@ -13,6 +13,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * 支出聚合查询：全库/按团的「已付成本」「待垫付」「待审批聚合列表」「月结已审未付」等，供 {@link com.lvying.service.FundService}与报销模块使用。
+ *
+ * <p>JPQL 中枚举以字符串字面量存储形态编写（与 {@link jakarta.persistence.EnumType#STRING} 一致）。
+ */
 public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
   @Query(

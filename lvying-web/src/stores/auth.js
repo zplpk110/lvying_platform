@@ -1,3 +1,6 @@
+/**
+ * 登录态：token 与用户信息持久化到 localStorage，供接口拦截器与页面权限判断。
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 

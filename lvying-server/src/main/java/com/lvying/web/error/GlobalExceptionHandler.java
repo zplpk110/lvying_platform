@@ -7,6 +7,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/**
+ * REST 统一异常：业务码、校验错误、实体未找到分别映射 400/404。
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+/** 尾款欠收列表与群发催收（演示写日志）。 */
 @RestController
 @RequestMapping("/api/collections")
 @RequiredArgsConstructor

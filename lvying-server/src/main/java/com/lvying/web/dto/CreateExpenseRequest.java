@@ -7,6 +7,9 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/**
+ * 记支出请求；超支时老板需传 {@code bossConfirmed=true}（与 {@link com.lvying.service.ExpenseService} 抛错码配合）。
+ */
 public record CreateExpenseRequest(
     @NotNull @DecimalMin("0.01") BigDecimal amount,
     @NotNull ExpenseCategory category,

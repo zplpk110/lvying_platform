@@ -15,6 +15,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 团期业务：新建/列表/详情、记收款、加游客、封团。
+ *
+ * <p>详情 {@link #getDetail(java.util.UUID)} 组装 {@link com.lvying.web.dto.TourDetailResponse}，其中财务块由 {@link
+ * FundService} 聚合，与 PRD「财务控制中心」三栏数据一致。
+ */
 @Service
 @RequiredArgsConstructor
 public class TourService {
@@ -25,6 +31,11 @@ public class TourService {
   private final TourGuestRepository tourGuestRepository;
   private final FundService fundService;
 
+  /**
+   * 新建团期；若带 {@code copyFromTourId} 则复制源团的毛利率、红线、提成等参数。
+   *
+   * <p>红线优先取请求中的 {@code budgetRedline}；否则按毛利率从应收推算；再否则默认按应收的 75% 作为成本上限。
+   */
   @Transactional
   public TourDetailResponse create(CreateTourRequest req) {
     BigDecimal revenue =
@@ -67,6 +78,7 @@ public class TourService {
     return revenue.multiply(new BigDecimal("0.75"));
   }
 
+  /** 进行中团列表（老板首页看板、团队列表页）。 */
   @Transactional(readOnly = true)
   public List<TourListItem> listInProgress() {
     return tourRepository.findByStatusOrderByDepartureDateAsc(TourStatus.IN_PROGRESS).stream()
@@ -82,6 +94,7 @@ public class TourService {
         .toList();
   }
 
+  /** 团详情 + 财务块（应收、已收、尾欠、成本、净利、提成预估）。 */
   @Transactional(readOnly = true)
   public TourDetailResponse getDetail(UUID id) {
     Tour tour =
@@ -89,6 +102,7 @@ public class TourService {
     return toDetail(tour);
   }
 
+  /** 记一笔收款，写入 {@link com.lvying.domain.Income}。 */
   @Transactional
   public TourDetailResponse recordIncome(UUID tourId, RecordIncomeRequest req) {
     Tour tour =
@@ -103,6 +117,7 @@ public class TourService {
     return getDetail(tourId);
   }
 
+  /** 添加游客，用于尾款催收名单与欠费明细。 */
   @Transactional
   public TourDetailResponse addGuest(UUID tourId, AddGuestRequest req) {
     Tour tour =
@@ -118,6 +133,7 @@ public class TourService {
     return getDetail(tourId);
   }
 
+  /** 申请封团：状态置为 {@link TourStatus#SETTLED}（仅老板接口层控制）。 */
   @Transactional
   public TourDetailResponse settle(UUID tourId) {
     Tour tour = tourRepository.getReferenceById(tourId);
@@ -126,6 +142,7 @@ public class TourService {
     return getDetail(tourId);
   }
 
+  /** 将实体 {@link Tour} 转为 API详情 DTO，并计算 finance 子对象。 */
   private TourDetailResponse toDetail(Tour tour) {
     UUID id = tour.getId();
     BigDecimal totalReceivable =

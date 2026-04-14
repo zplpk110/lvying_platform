@@ -14,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 极速报销：按「团 + 垫付人」聚合待办；审批、部分驳回；按月筛选已审未付生成代发 CSV；批量标记已打款。
+ */
 @Service
 @RequiredArgsConstructor
 public class ReimbursementService {
@@ -21,6 +24,7 @@ public class ReimbursementService {
   private final ExpenseRepository expenseRepository;
   private final UserRepository userRepository;
 
+  /** 老板审批页：待付/待审的员工垫付，按团号与业务员折叠。 */
   @Transactional(readOnly = true)
   public List<PendingGroup> pendingByTour() {
     List<Expense> list = expenseRepository.findPendingReimbursementForAggregation();
@@ -59,6 +63,7 @@ public class ReimbursementService {
         .toList();
   }
 
+  /** 单条通过：进入「已审未付」，计入全库 Pending_Cost直至财务打款。 */
   @Transactional
   public void approve(UUID expenseId, UUID approverId) {
     Expense e =
@@ -74,6 +79,7 @@ public class ReimbursementService {
     expenseRepository.save(e);
   }
 
+  /** 部分驳回：状态 {@link ExpenseApprovalStatus#PARTIAL_REJECT}，并写入备注。 */
   @Transactional
   public void partialReject(UUID expenseId, UUID approverId, String note) {
     Expense e =
@@ -87,6 +93,9 @@ public class ReimbursementService {
     expenseRepository.save(e);
   }
 
+  /**
+   * 月结代发：筛选当月创建、已审未付的员工垫付，按员工汇总金额与银行卡信息，返回行数据 + CSV 文本（上传网银用）。
+   */
   @Transactional(readOnly = true)
   public BatchExportResponse batchExport(int year, int month) {
     LocalDate start = LocalDate.of(year, month, 1);
@@ -123,7 +132,8 @@ public class ReimbursementService {
             .toList();
     String header = "姓名,金额,开户行,账号尾号,手机";
     String csv =
-        header            + "\n"
+        header
+            + "\n"
             + rows.stream()
                 .map(r -> String.join(",", r.staffName(), r.totalAmount(), r.bankName(), r.accountLast4(), r.phone()))
                 .collect(Collectors.joining("\n"));
@@ -131,6 +141,7 @@ public class ReimbursementService {
         year + "-" + String.format("%02d", month), rows, csv);
   }
 
+  /** 财务完成批量转账后，将对应报销单置为已付并记录批次号。 */
   @Transactional
   public void markBatchPaid(List<UUID> expenseIds, String batchRef) {
     List<Expense> list = expenseRepository.findAllById(expenseIds);
@@ -144,6 +155,7 @@ public class ReimbursementService {
     expenseRepository.saveAll(list);
   }
 
+  /** 按团 + 垫付人聚合的审批视图。 */
   public record PendingGroup(
       UUID tourId,
       String tourCode,
@@ -153,6 +165,7 @@ public class ReimbursementService {
       String totalAdvance,
       List<Line> lines) {}
 
+  /** 聚合内单笔垫付明细。 */
   public record Line(
       UUID id,
       String amount,
@@ -161,11 +174,14 @@ public class ReimbursementService {
       String approvalStatus,
       String createdAt) {}
 
+  /** 月结导出：期间标识、行列表、可直接下载的 CSV 全文。 */
   public record BatchExportResponse(String period, List<Row> rows, String csv) {
+    /** 每位员工一行汇总（网银代发）。 */
     public record Row(
         String staffName, String totalAmount, String bankName, String accountLast4, String phone) {}
   }
 
+  /** 月结按员工累加金额的临时结构。 */
   private static class Agg {
     final String name;
     final String bankName;

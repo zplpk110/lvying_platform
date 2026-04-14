@@ -13,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 尾款催收：欠收团列表、游客维度欠费；群发提醒 MVP 仅写 {@link com.lvying.domain.CollectionReminder}。
+ */
 @Service
 @RequiredArgsConstructor
 public class CollectionService {
@@ -21,6 +24,7 @@ public class CollectionService {
   private final CollectionReminderRepository reminderRepository;
   private final FundService fundService;
 
+  /** 仍有尾款未收齐的进行中团（按应收−已实收判断），附带游客列表。 */
   @Transactional(readOnly = true)
   public List<OverdueTour> overdueBalanceList() {
     List<Tour> tours =
@@ -54,7 +58,9 @@ public class CollectionService {
     return out;
   }
 
-  /** MVP：写库 + 返回预览，短信通道后续对接 */
+  /**
+   * 对指定团生成催收记录（演示）：按游客 {@code balanceDue} 写多条 {@link CollectionReminder}，无游客时按团总欠写一条。
+   */
   @Transactional
   public BulkRemindResult bulkRemind(List<UUID> tourIds) {
     List<String> previews = new ArrayList<>();
@@ -88,6 +94,7 @@ public class CollectionService {
     return new BulkRemindResult(previews.size(), previews);
   }
 
+  /** 仍有尾款未收齐的团及销售、游客欠费列表。 */
   public record OverdueTour(
       UUID tourId,
       String tourCode,
@@ -97,7 +104,9 @@ public class CollectionService {
       String salesName,
       List<GuestRow> guests) {}
 
+  /** 游客维度欠费（展示用手机脱敏）。 */
   public record GuestRow(String name, String phoneMasked, String balanceDue) {}
 
+  /** 催收演示结果：记录条数与话术预览列表。 */
   public record BulkRemindResult(int sent, List<String> previews) {}
 }
