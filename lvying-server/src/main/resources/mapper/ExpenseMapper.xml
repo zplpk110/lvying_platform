@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lvying.mapper.ExpenseMapper">
+
+  <resultMap id="ExpenseResult" type="com.lvying.domain.Expense">
+    <id column="id" property="id" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="tour_id" property="tourId" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="amount" property="amount"/>
+    <result column="category" property="category" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="payment_method" property="paymentMethod" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="staff_user_id" property="staffUserId" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="receipt_image_url" property="receiptImageUrl"/>
+    <result column="note" property="note"/>
+    <result column="approval_status" property="approvalStatus" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="pay_status" property="payStatus" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="approved_by_id" property="approvedById" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="approved_at" property="approvedAt"/>
+    <result column="batch_pay_ref" property="batchPayRef"/>
+    <result column="created_at" property="createdAt"/>
+    <result column="updated_at" property="updatedAt"/>
+  </resultMap>
+
+  <resultMap id="PendingRow" type="com.lvying.mapper.dto.ExpensePendingRow">
+    <id column="id" property="id" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="amount" property="amount"/>
+    <result column="category" property="category" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="receipt_image_url" property="receiptImageUrl"/>
+    <result column="approval_status" property="approvalStatus" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="created_at" property="createdAt"/>
+    <result column="tour_id" property="tourId" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="tour_code" property="tourCode"/>
+    <result column="tour_name" property="tourName"/>
+    <result column="staff_user_id" property="staffUserId" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="staff_name" property="staffName"/>
+  </resultMap>
+
+  <resultMap id="StaffListRow" type="com.lvying.mapper.dto.ExpenseStaffListRow">
+    <id column="id" property="id" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="created_at" property="createdAt"/>
+    <result column="tour_code" property="tourCode"/>
+    <result column="tour_name" property="tourName"/>
+    <result column="category" property="category" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="payment_method" property="paymentMethod" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="amount" property="amount"/>
+    <result column="approval_status" property="approvalStatus" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="pay_status" property="payStatus" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+  </resultMap>
+
+  <resultMap id="MonthExportRow" type="com.lvying.mapper.dto.ExpenseMonthExportRow">
+    <id column="id" property="id" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="staff_user_id" property="staffUserId" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="amount" property="amount"/>
+    <result column="created_at" property="createdAt"/>
+    <result column="staff_name" property="staffName"/>
+    <result column="bank_name" property="bankName"/>
+    <result column="bank_account_last4" property="bankAccountLast4"/>
+    <result column="phone" property="phone"/>
+  </resultMap>
+
+  <sql id="ExpenseCols">id, tour_id, amount, category, payment_method, staff_user_id, receipt_image_url, note,
+    approval_status, pay_status, approved_by_id, approved_at, batch_pay_ref, created_at, updated_at</sql>
+
+  <select id="selectById" resultMap="ExpenseResult">
+    SELECT <include refid="ExpenseCols"/> FROM expenses
+    WHERE id = #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+  </select>
+
+  <select id="sumPaidCostGlobal" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE approval_status != 'REJECTED'
+    AND (payment_method = 'COMPANY_ACCOUNT'
+      OR (payment_method = 'STAFF_ADVANCE' AND pay_status = 'PAID'))
+  </select>
+
+  <select id="sumPendingStaffApprovedGlobal" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE payment_method = 'STAFF_ADVANCE'
+    AND approval_status = 'APPROVED' AND pay_status = 'UNPAID'
+  </select>
+
+  <select id="sumPaidCostByTour" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(amount), 0) FROM expenses
+    WHERE tour_id = #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+    AND approval_status != 'REJECTED'
+    AND (payment_method = 'COMPANY_ACCOUNT'
+      OR (payment_method = 'STAFF_ADVANCE' AND pay_status = 'PAID'))
+  </select>
+
+  <select id="sumPendingStaffByTour" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(amount), 0) FROM expenses
+    WHERE tour_id = #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+    AND payment_method = 'STAFF_ADVANCE'
+    AND approval_status IN ('PENDING', 'APPROVED') AND pay_status = 'UNPAID'
+  </select>
+
+  <select id="countByPaymentMethodAndApprovalStatus" resultType="long">
+    SELECT COUNT(*) FROM expenses
+    WHERE payment_method = #{paymentMethod} AND approval_status = #{approvalStatus}
+  </select>
+
+  <select id="selectPendingReimbursementForAggregation" resultMap="PendingRow">
+    SELECT e.id, e.amount, e.category, e.receipt_image_url, e.approval_status, e.created_at,
+      e.tour_id, t.tour_code, t.name AS tour_name, e.staff_user_id, u.name AS staff_name
+    FROM expenses e
+    INNER JOIN tours t ON e.tour_id = t.id
+    INNER JOIN users u ON e.staff_user_id = u.id
+    WHERE e.payment_method = 'STAFF_ADVANCE'
+      AND e.approval_status IN ('PENDING', 'APPROVED') AND e.pay_status = 'UNPAID'
+    ORDER BY t.tour_code, u.name, e.created_at
+  </select>
+
+  <select id="selectByStaffUserIdOrderByCreatedAtDesc" resultMap="StaffListRow">
+    SELECT e.id, e.created_at, t.tour_code, t.name AS tour_name, e.category, e.payment_method,
+      e.amount, e.approval_status, e.pay_status
+    FROM expenses e
+    INNER JOIN tours t ON e.tour_id = t.id
+    WHERE e.staff_user_id = #{staffUserId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+    ORDER BY e.created_at DESC
+  </select>
+
+  <select id="selectApprovedUnpaidStaffInRange" resultMap="MonthExportRow">
+    SELECT e.id, e.staff_user_id, e.amount, e.created_at,
+      u.name AS staff_name, u.bank_name, u.bank_account_last4, u.phone
+    FROM expenses e
+    INNER JOIN users u ON e.staff_user_id = u.id
+    WHERE e.payment_method = 'STAFF_ADVANCE'
+      AND e.approval_status = 'APPROVED' AND e.pay_status = 'UNPAID'
+      AND e.created_at &gt;= #{start} AND e.created_at &lt;= #{end}
+    ORDER BY u.name, e.created_at
+  </select>
+
+  <insert id="insert">
+    INSERT INTO expenses (<include refid="ExpenseCols"/>)
+    VALUES (
+      #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{amount},
+      #{category, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      #{paymentMethod, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      #{staffUserId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{receiptImageUrl}, #{note},
+      #{approvalStatus, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      #{payStatus, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      #{approvedById, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{approvedAt}, #{batchPayRef}, #{createdAt}, #{updatedAt}
+    )
+  </insert>
+
+  <update id="update">
+    UPDATE expenses SET
+      tour_id = #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      amount = #{amount},
+      category = #{category, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      payment_method = #{paymentMethod, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      staff_user_id = #{staffUserId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      receipt_image_url = #{receiptImageUrl},
+      note = #{note},
+      approval_status = #{approvalStatus, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      pay_status = #{payStatus, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      approved_by_id = #{approvedById, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      approved_at = #{approvedAt},
+      batch_pay_ref = #{batchPayRef},
+      updated_at = #{updatedAt}
+    WHERE id = #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+  </update>
+</mapper>

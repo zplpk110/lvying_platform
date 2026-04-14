@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lvying.mapper.CollectionReminderMapper">
+
+  <insert id="insert">
+    INSERT INTO collection_reminders (id, tour_id, channel, payload, sent_at)
+    VALUES (
+      #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{channel}, #{payload}, #{sentAt}
+    )
+  </insert>
+</mapper>

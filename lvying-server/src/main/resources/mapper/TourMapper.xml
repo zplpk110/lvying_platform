@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lvying.mapper.TourMapper">
+
+  <resultMap id="TourResult" type="com.lvying.domain.Tour">
+    <id column="id" property="id" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="tour_code" property="tourCode"/>
+    <result column="name" property="name"/>
+    <result column="status" property="status" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="departure_date" property="departureDate"/>
+    <result column="guest_count" property="guestCount"/>
+    <result column="price_per_guest" property="pricePerGuest"/>
+    <result column="budget_redline" property="budgetRedline"/>
+    <result column="gross_margin_pct" property="grossMarginPct"/>
+    <result column="sales_user_id" property="salesUserId" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="commission_rate" property="commissionRate"/>
+    <result column="created_at" property="createdAt"/>
+    <result column="updated_at" property="updatedAt"/>
+  </resultMap>
+
+  <resultMap id="TourListRowResult" type="com.lvying.mapper.dto.TourListRow">
+    <id column="id" property="id" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="tour_code" property="tourCode"/>
+    <result column="name" property="name"/>
+    <result column="departure_date" property="departureDate"/>
+    <result column="status" property="status" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="sales_name" property="salesName"/>
+  </resultMap>
+
+  <sql id="Cols">id, tour_code, name, status, departure_date, guest_count, price_per_guest, budget_redline,
+ gross_margin_pct, sales_user_id, commission_rate, created_at, updated_at</sql>
+
+  <select id="selectById" resultMap="TourResult">
+    SELECT <include refid="Cols"/> FROM tours WHERE id = #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+  </select>
+
+  <select id="selectByTourCode" resultMap="TourResult">
+    SELECT <include refid="Cols"/> FROM tours WHERE tour_code = #{tourCode}
+  </select>
+
+  <select id="selectByStatusOrderByDepartureDate" resultMap="TourResult">
+    SELECT <include refid="Cols"/> FROM tours WHERE status = #{statusName}
+    ORDER BY departure_date ASC
+  </select>
+
+  <select id="selectInProgressWithSalesName" resultMap="TourListRowResult">
+    SELECT t.id, t.tour_code, t.name, t.departure_date, t.status, u.name AS sales_name
+    FROM tours t
+    LEFT JOIN users u ON t.sales_user_id = u.id
+    WHERE t.status = 'IN_PROGRESS'
+    ORDER BY t.departure_date ASC
+  </select>
+
+  <insert id="insert">
+    INSERT INTO tours (<include refid="Cols"/>)
+    VALUES (
+      #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{tourCode}, #{name}, #{status, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      #{departureDate}, #{guestCount}, #{pricePerGuest}, #{budgetRedline}, #{grossMarginPct},
+      #{salesUserId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{commissionRate}, #{createdAt}, #{updatedAt}
+    )
+  </insert>
+
+  <update id="update">
+    UPDATE tours SET
+      tour_code = #{tourCode},
+      name = #{name},
+      status = #{status, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      departure_date = #{departureDate},
+      guest_count = #{guestCount},
+      price_per_guest = #{pricePerGuest},
+      budget_redline = #{budgetRedline},
+      gross_margin_pct = #{grossMarginPct},
+      sales_user_id = #{salesUserId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      commission_rate = #{commissionRate},
+      updated_at = #{updatedAt}
+    WHERE id = #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+  </update>
+
+</mapper>

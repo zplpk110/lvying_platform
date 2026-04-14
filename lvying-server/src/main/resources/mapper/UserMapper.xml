@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lvying.mapper.UserMapper">
+
+  <resultMap id="UserResult" type="com.lvying.domain.User">
+    <id column="id" property="id" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="phone" property="phone"/>
+    <result column="password_hash" property="passwordHash"/>
+    <result column="name" property="name"/>
+    <result column="role" property="role" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    <result column="bank_name" property="bankName"/>
+    <result column="bank_account_last4" property="bankAccountLast4"/>
+    <result column="created_at" property="createdAt"/>
+    <result column="updated_at" property="updatedAt"/>
+  </resultMap>
+
+  <sql id="Base_Column">id, phone, password_hash, name, role, bank_name, bank_account_last4, created_at, updated_at</sql>
+
+  <select id="selectByPhone" resultMap="UserResult">
+    SELECT <include refid="Base_Column"/> FROM users WHERE phone = #{phone}
+  </select>
+
+  <select id="selectById" resultMap="UserResult">
+    SELECT <include refid="Base_Column"/> FROM users WHERE id = #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+  </select>
+
+  <select id="selectByRoleOrderByName" resultMap="UserResult">
+    SELECT <include refid="Base_Column"/> FROM users WHERE role = #{roleName}
+    ORDER BY name ASC
+  </select>
+
+  <select id="count" resultType="long">SELECT COUNT(*) FROM users</select>
+
+  <insert id="insert">
+    INSERT INTO users (id, phone, password_hash, name, role, bank_name, bank_account_last4, created_at, updated_at)
+    VALUES (
+      #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{phone}, #{passwordHash}, #{name},
+      #{role, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      #{bankName}, #{bankAccountLast4}, #{createdAt}, #{updatedAt}
+    )
+  </insert>
+
+  <update id="update">
+    UPDATE users SET
+      phone = #{phone},
+      password_hash = #{passwordHash},
+      name = #{name},
+      role = #{role, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      bank_name = #{bankName},
+      bank_account_last4 = #{bankAccountLast4},
+      updated_at = #{updatedAt}
+    WHERE id = #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+  </update>
+</mapper>

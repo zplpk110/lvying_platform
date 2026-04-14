@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lvying.mapper.IncomeMapper">
+
+  <insert id="insert">
+    INSERT INTO incomes (id, tour_id, amount, type, note, received_at, created_at)
+    VALUES (
+      #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{amount},
+      #{type, typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+      #{note}, #{receivedAt}, #{createdAt}
+    )
+  </insert>
+
+  <select id="sumAllAmount" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(amount), 0) FROM incomes
+  </select>
+
+  <select id="sumAmountByTourId" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(amount), 0) FROM incomes
+    WHERE tour_id = #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+  </select>
+
+  <select id="sumAmountByTourIdAndType" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(amount), 0) FROM incomes
+    WHERE tour_id = #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+      AND type = #{typeName}
+  </select>
+</mapper>

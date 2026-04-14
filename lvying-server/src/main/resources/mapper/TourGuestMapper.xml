@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lvying.mapper.TourGuestMapper">
+
+  <resultMap id="GuestResult" type="com.lvying.domain.TourGuest">
+    <id column="id" property="id" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="tour_id" property="tourId" typeHandler="com.lvying.mybatis.handler.UuidCharTypeHandler"/>
+    <result column="name" property="name"/>
+    <result column="phone_masked" property="phoneMasked"/>
+    <result column="phone_raw" property="phoneRaw"/>
+    <result column="balance_due" property="balanceDue"/>
+    <result column="created_at" property="createdAt"/>
+  </resultMap>
+
+  <select id="selectByTourId" resultMap="GuestResult">
+    SELECT id, tour_id, name, phone_masked, phone_raw, balance_due, created_at
+    FROM tour_guests WHERE tour_id = #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler}
+  </select>
+
+  <insert id="insert">
+    INSERT INTO tour_guests (id, tour_id, name, phone_masked, phone_raw, balance_due, created_at)
+    VALUES (
+      #{id, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{tourId, typeHandler=com.lvying.mybatis.handler.UuidCharTypeHandler},
+      #{name}, #{phoneMasked}, #{phoneRaw}, #{balanceDue}, #{createdAt}
+    )
+  </insert>
+</mapper>
