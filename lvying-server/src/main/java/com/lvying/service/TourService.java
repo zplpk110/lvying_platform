@@ -1,14 +1,15 @@
 package com.lvying.service;
 
 import com.lvying.domain.*;
-import com.lvying.repo.IncomeRepository;
-import com.lvying.repo.TourGuestRepository;
-import com.lvying.repo.TourRepository;
-import com.lvying.repo.UserRepository;
+import com.lvying.mapper.IncomeMapper;
+import com.lvying.mapper.TourGuestMapper;
+import com.lvying.mapper.TourMapper;
+import com.lvying.mapper.UserMapper;
 import com.lvying.web.dto.*;
-import jakarta.persistence.EntityNotFoundException;
+import com.lvying.web.error.BusinessException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TourService {
 
-  private final TourRepository tourRepository;
-  private final UserRepository userRepository;
-  private final IncomeRepository incomeRepository;
-  private final TourGuestRepository tourGuestRepository;
+  private final TourMapper tourMapper;
+  private final UserMapper userMapper;
+  private final IncomeMapper incomeMapper;
+  private final TourGuestMapper tourGuestMapper;
   private final FundService fundService;
 
   /**
@@ -41,9 +42,10 @@ public class TourService {
     BigDecimal revenue =
         BigDecimal.valueOf(req.guestCount()).multiply(req.pricePerGuest());
     BigDecimal redline = computeRedline(req, revenue);
-    User sales = req.salesUserId() != null ? userRepository.getReferenceById(req.salesUserId()) : null;
+    LocalDateTime now = LocalDateTime.now();
     Tour tour =
         Tour.builder()
+            .id(UUID.randomUUID())
             .tourCode(req.tourCode())
             .name(req.name())
             .departureDate(req.departureDate())
@@ -51,20 +53,22 @@ public class TourService {
             .pricePerGuest(req.pricePerGuest())
             .budgetRedline(redline)
             .grossMarginPct(req.grossMarginPct() != null ? req.grossMarginPct() : new BigDecimal("25"))
-            .salesUser(sales)
+            .salesUserId(req.salesUserId())
             .status(TourStatus.IN_PROGRESS)
+            .commissionRate(new BigDecimal("15"))
+            .createdAt(now)
+            .updatedAt(now)
             .build();
-    tour = tourRepository.save(tour);
+    tourMapper.insert(tour);
     if (req.copyFromTourId() != null) {
-      tourRepository
-          .findById(req.copyFromTourId())
-          .ifPresent(
-              src -> {
-                tour.setBudgetRedline(src.getBudgetRedline());
-                tour.setGrossMarginPct(src.getGrossMarginPct());
-                tour.setCommissionRate(src.getCommissionRate());
-                tourRepository.save(tour);
-              });
+      Tour src = tourMapper.selectById(req.copyFromTourId());
+      if (src != null) {
+        tour.setBudgetRedline(src.getBudgetRedline());
+        tour.setGrossMarginPct(src.getGrossMarginPct());
+        tour.setCommissionRate(src.getCommissionRate());
+        tour.setUpdatedAt(LocalDateTime.now());
+        tourMapper.update(tour);
+      }
     }
     return getDetail(tour.getId());
   }
@@ -81,38 +85,45 @@ public class TourService {
   /** 进行中团列表（老板首页看板、团队列表页）。 */
   @Transactional(readOnly = true)
   public List<TourListItem> listInProgress() {
-    return tourRepository.findByStatusOrderByDepartureDateAsc(TourStatus.IN_PROGRESS).stream()
+    return tourMapper.selectInProgressWithSalesName().stream()
         .map(
-            t ->
+            row ->
                 new TourListItem(
-                    t.getId(),
-                    t.getTourCode(),
-                    t.getName(),
-                    t.getDepartureDate(),
-                    t.getStatus(),
-                    t.getSalesUser() != null ? t.getSalesUser().getName() : null))
+                    row.getId(),
+                    row.getTourCode(),
+                    row.getName(),
+                    row.getDepartureDate(),
+                    row.getStatus(),
+                    row.getSalesName()))
         .toList();
   }
 
   /** 团详情 + 财务块（应收、已收、尾欠、成本、净利、提成预估）。 */
   @Transactional(readOnly = true)
   public TourDetailResponse getDetail(UUID id) {
-    Tour tour =
-        tourRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("团不存在"));
+    Tour tour = tourMapper.selectById(id);
+    if (tour == null) {
+      throw new BusinessException("NOT_FOUND", "团不存在");
+    }
     return toDetail(tour);
   }
 
   /** 记一笔收款，写入 {@link com.lvying.domain.Income}。 */
   @Transactional
   public TourDetailResponse recordIncome(UUID tourId, RecordIncomeRequest req) {
-    Tour tour =
-        tourRepository.findById(tourId).orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("团不存在"));
-    incomeRepository.save(
+    if (tourMapper.selectById(tourId) == null) {
+      throw new BusinessException("NOT_FOUND", "团不存在");
+    }
+    LocalDateTime now = LocalDateTime.now();
+    incomeMapper.insert(
         Income.builder()
-            .tour(tour)
+            .id(UUID.randomUUID())
+            .tourId(tourId)
             .amount(req.amount())
             .type(req.type())
             .note(req.note())
+            .receivedAt(now)
+            .createdAt(now)
             .build());
     return getDetail(tourId);
   }
@@ -120,15 +131,19 @@ public class TourService {
   /** 添加游客，用于尾款催收名单与欠费明细。 */
   @Transactional
   public TourDetailResponse addGuest(UUID tourId, AddGuestRequest req) {
-    Tour tour =
-        tourRepository.findById(tourId).orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("团不存在"));
-    tourGuestRepository.save(
+    if (tourMapper.selectById(tourId) == null) {
+      throw new BusinessException("NOT_FOUND", "团不存在");
+    }
+    LocalDateTime now = LocalDateTime.now();
+    tourGuestMapper.insert(
         TourGuest.builder()
-            .tour(tour)
+            .id(UUID.randomUUID())
+            .tourId(tourId)
             .name(req.name())
             .phoneMasked(req.phoneMasked())
             .phoneRaw(req.phoneRaw())
             .balanceDue(req.balanceDue() != null ? req.balanceDue() : BigDecimal.ZERO)
+            .createdAt(now)
             .build());
     return getDetail(tourId);
   }
@@ -136,9 +151,13 @@ public class TourService {
   /** 申请封团：状态置为 {@link TourStatus#SETTLED}（仅老板接口层控制）。 */
   @Transactional
   public TourDetailResponse settle(UUID tourId) {
-    Tour tour = tourRepository.getReferenceById(tourId);
+    Tour tour = tourMapper.selectById(tourId);
+    if (tour == null) {
+      throw new BusinessException("NOT_FOUND", "团不存在");
+    }
     tour.setStatus(TourStatus.SETTLED);
-    tourRepository.save(tour);
+    tour.setUpdatedAt(LocalDateTime.now());
+    tourMapper.update(tour);
     return getDetail(tourId);
   }
 
@@ -152,8 +171,10 @@ public class TourService {
     BigDecimal pend = fundService.tourPendingStaffCost(id);
     BigDecimal est = paid.add(pend);
     BigDecimal net = incomeSum.subtract(est);
-    BigDecimal deposit = nz(incomeRepository.sumAmountByTourIdAndType(id, IncomeType.DEPOSIT));
-    BigDecimal balance = nz(incomeRepository.sumAmountByTourIdAndType(id, IncomeType.BALANCE));
+    BigDecimal deposit =
+        nz(incomeMapper.sumAmountByTourIdAndType(id, IncomeType.DEPOSIT.name()));
+    BigDecimal balance =
+        nz(incomeMapper.sumAmountByTourIdAndType(id, IncomeType.BALANCE.name()));
     BigDecimal tail = totalReceivable.subtract(incomeSum);
     BigDecimal redline = tour.getBudgetRedline();
     BigDecimal surplus = redline.subtract(est);
@@ -164,9 +185,11 @@ public class TourService {
             : BigDecimal.ZERO;
 
     LoginResponse.UserInfo sales = null;
-    if (tour.getSalesUser() != null) {
-      User u = tour.getSalesUser();
-      sales = new LoginResponse.UserInfo(u.getId(), u.getName(), u.getPhone(), u.getRole());
+    if (tour.getSalesUserId() != null) {
+      User u = userMapper.selectById(tour.getSalesUserId());
+      if (u != null) {
+        sales = new LoginResponse.UserInfo(u.getId(), u.getName(), u.getPhone(), u.getRole());
+      }
     }
 
     var finance =

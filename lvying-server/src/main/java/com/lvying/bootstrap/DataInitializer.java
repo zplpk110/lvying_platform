@@ -1,9 +1,15 @@
 package com.lvying.bootstrap;
 
 import com.lvying.domain.*;
-import com.lvying.repo.*;
+import com.lvying.mapper.ExpenseMapper;
+import com.lvying.mapper.IncomeMapper;
+import com.lvying.mapper.TourGuestMapper;
+import com.lvying.mapper.TourMapper;
+import com.lvying.mapper.UserMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -19,104 +25,144 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @RequiredArgsConstructor
 public class DataInitializer {
 
-  private final UserRepository userRepository;
-  private final TourRepository tourRepository;
-  private final TourGuestRepository tourGuestRepository;
-  private final IncomeRepository incomeRepository;
-  private final ExpenseRepository expenseRepository;
+  private final UserMapper userMapper;
+  private final TourMapper tourMapper;
+  private final TourGuestMapper tourGuestMapper;
+  private final IncomeMapper incomeMapper;
+  private final ExpenseMapper expenseMapper;
   private final PasswordEncoder passwordEncoder;
 
   @Bean
   CommandLineRunner seed() {
     return args -> {
-      // 已有用户则跳过，避免重复执行主类时主键/唯一约束冲突
-      if (userRepository.count() > 0) return;
-      User boss =
-          userRepository.save(
-              User.builder()
-                  .phone("13800000001")
-                  .passwordHash(passwordEncoder.encode("demo123456"))
-                  .name("王老板")
-                  .role(UserRole.BOSS_FINANCE)
-                  .bankName("招商银行")
-                  .bankAccountLast4("8888")
-                  .build());
-      User zhang =
-          userRepository.save(
-              User.builder()
-                  .phone("13800000002")
-                  .passwordHash(passwordEncoder.encode("demo123456"))
-                  .name("张三")
-                  .role(UserRole.SALES_GUIDE)
-                  .bankName("招商银行")
-                  .bankAccountLast4("6666")
-                  .build());
-      Tour tour =
-          tourRepository.save(
-              Tour.builder()
-                  .tourCode("HZ0420")
-                  .name("杭州2日游")
-                  .status(TourStatus.IN_PROGRESS)
-                  .departureDate(LocalDate.of(2026, 4, 20))
-                  .guestCount(20)
-                  .pricePerGuest(new BigDecimal("1000"))
-                  .budgetRedline(new BigDecimal("15000"))
-                  .grossMarginPct(new BigDecimal("25"))
-                  .salesUser(zhang)
-                  .commissionRate(new BigDecimal("15"))
-                  .build());
-      tourGuestRepository.save(
+      if (userMapper.count() > 0) return;
+      LocalDateTime now = LocalDateTime.now();
+      UUID bossId = UUID.randomUUID();
+      UUID zhangId = UUID.randomUUID();
+      UUID tourId = UUID.randomUUID();
+      userMapper.insert(
+          User.builder()
+              .id(bossId)
+              .phone("13800000001")
+              .passwordHash(passwordEncoder.encode("demo123456"))
+              .name("王老板")
+              .role(UserRole.BOSS_FINANCE)
+              .bankName("招商银行")
+              .bankAccountLast4("8888")
+              .createdAt(now)
+              .updatedAt(now)
+              .build());
+      userMapper.insert(
+          User.builder()
+              .id(zhangId)
+              .phone("13800000002")
+              .passwordHash(passwordEncoder.encode("demo123456"))
+              .name("张三")
+              .role(UserRole.SALES_GUIDE)
+              .bankName("招商银行")
+              .bankAccountLast4("6666")
+              .createdAt(now)
+              .updatedAt(now)
+              .build());
+      tourMapper.insert(
+          Tour.builder()
+              .id(tourId)
+              .tourCode("HZ0420")
+              .name("杭州2日游")
+              .status(TourStatus.IN_PROGRESS)
+              .departureDate(LocalDate.of(2026, 4, 20))
+              .guestCount(20)
+              .pricePerGuest(new BigDecimal("1000"))
+              .budgetRedline(new BigDecimal("15000"))
+              .grossMarginPct(new BigDecimal("25"))
+              .salesUserId(zhangId)
+              .commissionRate(new BigDecimal("15"))
+              .createdAt(now)
+              .updatedAt(now)
+              .build());
+      tourGuestMapper.insert(
           TourGuest.builder()
-              .tour(tour)
+              .id(UUID.randomUUID())
+              .tourId(tourId)
               .name("王先生")
               .phoneMasked("139****0000")
               .phoneRaw("13900000000")
               .balanceDue(new BigDecimal("4000"))
+              .createdAt(now)
               .build());
-      incomeRepository.save(
+      incomeMapper.insert(
           Income.builder()
-              .tour(tour)
+              .id(UUID.randomUUID())
+              .tourId(tourId)
               .amount(new BigDecimal("6000"))
               .type(IncomeType.DEPOSIT)
+              .note(null)
+              .receivedAt(now)
+              .createdAt(now)
               .build());
-      incomeRepository.save(
+      incomeMapper.insert(
           Income.builder()
-              .tour(tour)
+              .id(UUID.randomUUID())
+              .tourId(tourId)
               .amount(new BigDecimal("10000"))
               .type(IncomeType.BALANCE)
+              .note(null)
+              .receivedAt(now)
+              .createdAt(now)
               .build());
-      expenseRepository.save(
+      expenseMapper.insert(
           Expense.builder()
-              .tour(tour)
+              .id(UUID.randomUUID())
+              .tourId(tourId)
               .amount(new BigDecimal("5000"))
               .category(ExpenseCategory.LODGING)
               .paymentMethod(PaymentMethod.COMPANY_ACCOUNT)
+              .staffUserId(null)
+              .receiptImageUrl(null)
+              .note(null)
               .approvalStatus(ExpenseApprovalStatus.APPROVED)
               .payStatus(ExpensePayStatus.PAID)
-              .approvedBy(boss)
-              .approvedAt(java.time.Instant.now())
+              .approvedById(bossId)
+              .approvedAt(now)
+              .batchPayRef(null)
+              .createdAt(now)
+              .updatedAt(now)
               .build());
-      expenseRepository.save(
+      expenseMapper.insert(
           Expense.builder()
-              .tour(tour)
+              .id(UUID.randomUUID())
+              .tourId(tourId)
               .amount(new BigDecimal("65"))
               .category(ExpenseCategory.TRANSPORT)
               .paymentMethod(PaymentMethod.STAFF_ADVANCE)
-              .staffUser(zhang)
+              .staffUserId(zhangId)
+              .receiptImageUrl(null)
+              .note(null)
               .approvalStatus(ExpenseApprovalStatus.APPROVED)
               .payStatus(ExpensePayStatus.UNPAID)
-              .approvedBy(boss)
-              .approvedAt(java.time.Instant.now())
+              .approvedById(bossId)
+              .approvedAt(now)
+              .batchPayRef(null)
+              .createdAt(now)
+              .updatedAt(now)
               .build());
-      expenseRepository.save(
+      expenseMapper.insert(
           Expense.builder()
-              .tour(tour)
+              .id(UUID.randomUUID())
+              .tourId(tourId)
               .amount(new BigDecimal("45"))
               .category(ExpenseCategory.DINING)
               .paymentMethod(PaymentMethod.STAFF_ADVANCE)
-              .staffUser(zhang)
+              .staffUserId(zhangId)
+              .receiptImageUrl(null)
+              .note(null)
               .approvalStatus(ExpenseApprovalStatus.PENDING)
               .payStatus(ExpensePayStatus.UNPAID)
+              .approvedById(null)
+              .approvedAt(null)
+              .batchPayRef(null)
+              .createdAt(now)
+              .updatedAt(now)
               .build());
     };
   }

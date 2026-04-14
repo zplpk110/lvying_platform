@@ -1,8 +1,9 @@
 package com.lvying.service;
 
 import com.lvying.domain.*;
-import com.lvying.repo.ExpenseRepository;
-import com.lvying.repo.TourRepository;
+import com.lvying.mapper.ExpenseMapper;
+import com.lvying.mapper.TourMapper;
+import com.lvying.mapper.dto.ExpenseStaffListRow;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -22,8 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DashboardService {
 
-  private final TourRepository tourRepository;
-  private final ExpenseRepository expenseRepository;
+  private final TourMapper tourMapper;
+  private final ExpenseMapper expenseMapper;
   private final FundService fundService;
 
   /**
@@ -32,12 +33,12 @@ public class DashboardService {
   @Transactional(readOnly = true)
   public BossHomeResponse bossHome() {
     long pendingApproval =
-        expenseRepository.countByPaymentMethodAndApprovalStatus(
-            PaymentMethod.STAFF_ADVANCE, ExpenseApprovalStatus.PENDING);
+        expenseMapper.countByPaymentMethodAndApprovalStatus(
+            PaymentMethod.STAFF_ADVANCE.name(), ExpenseApprovalStatus.PENDING.name());
     LocalDate now = LocalDate.now();
     LocalDate in3 = now.plusDays(3);
     List<Tour> tours =
-        tourRepository.findByStatusOrderByDepartureDateAsc(TourStatus.IN_PROGRESS);
+        tourMapper.selectByStatusOrderByDepartureDate(TourStatus.IN_PROGRESS.name());
     int tailDue = 0;
     int marginAlert = 0;
     List<BoardRow> board = new ArrayList<>();
@@ -97,7 +98,8 @@ public class DashboardService {
    */
   @Transactional(readOnly = true)
   public StaffHomeResponse staffHome(UUID userId) {
-    List<Expense> lines = expenseRepository.findByStaffUserIdOrderByCreatedAtDesc(userId);
+    List<ExpenseStaffListRow> lines =
+        expenseMapper.selectByStaffUserIdOrderByCreatedAtDesc(userId);
     BigDecimal pending =
         lines.stream()
             .filter(
@@ -105,7 +107,7 @@ public class DashboardService {
                     e.getPaymentMethod() == PaymentMethod.STAFF_ADVANCE
                         && e.getApprovalStatus() == ExpenseApprovalStatus.APPROVED
                         && e.getPayStatus() == ExpensePayStatus.UNPAID)
-            .map(Expense::getAmount)
+            .map(ExpenseStaffListRow::getAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     List<StaffLine> rows =
         lines.stream()
@@ -125,8 +127,8 @@ public class DashboardService {
                   return new StaffLine(
                       e.getId(),
                       e.getCreatedAt().toString().substring(0, 10),
-                      e.getTour().getTourCode(),
-                      e.getTour().getName(),
+                      e.getTourCode(),
+                      e.getTourName(),
                       e.getCategory().name(),
                       e.getAmount().toPlainString(),
                       e.getApprovalStatus().name(),

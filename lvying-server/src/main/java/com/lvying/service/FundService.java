@@ -1,8 +1,8 @@
 package com.lvying.service;
 
 import com.lvying.config.LvyingProperties;
-import com.lvying.repo.ExpenseRepository;
-import com.lvying.repo.IncomeRepository;
+import com.lvying.mapper.ExpenseMapper;
+import com.lvying.mapper.IncomeMapper;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -28,20 +28,20 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FundService {
 
-  private final IncomeRepository incomeRepository;
-  private final ExpenseRepository expenseRepository;
+  private final IncomeMapper incomeMapper;
+  private final ExpenseMapper expenseMapper;
   private final LvyingProperties properties;
 
   /** 全库实收现金合计（PRD：Actual_Income）。 */
   @Transactional(readOnly = true)
   public BigDecimal totalActualIncome() {
-    return nz(incomeRepository.sumAllAmount());
+    return nz(incomeMapper.sumAllAmount());
   }
 
   /** 全库已付固定成本合计（PRD：Paid_Cost，公账 + 已打款垫付）。 */
   @Transactional(readOnly = true)
   public BigDecimal totalPaidCost() {
-    return nz(expenseRepository.sumPaidCostGlobal());
+    return nz(expenseMapper.sumPaidCostGlobal());
   }
 
   /**
@@ -51,7 +51,7 @@ public class FundService {
    */
   @Transactional(readOnly = true)
   public BigDecimal totalPendingCost() {
-    return nz(expenseRepository.sumPendingStaffApprovedGlobal());
+    return nz(expenseMapper.sumPendingStaffApprovedGlobal());
   }
 
   /**
@@ -70,13 +70,13 @@ public class FundService {
   /** 指定团已确认收款合计。 */
   @Transactional(readOnly = true)
   public BigDecimal tourIncomeSum(UUID tourId) {
-    return nz(incomeRepository.sumAmountByTourId(tourId));
+    return nz(incomeMapper.sumAmountByTourId(tourId));
   }
 
   /** 指定团已付成本：公账 + 已对员工打款的垫付。 */
   @Transactional(readOnly = true)
   public BigDecimal tourPaidCost(UUID tourId) {
-    return nz(expenseRepository.sumPaidCostByTour(tourId));
+    return nz(expenseMapper.sumPaidCostByTour(tourId));
   }
 
   /**
@@ -86,7 +86,7 @@ public class FundService {
    */
   @Transactional(readOnly = true)
   public BigDecimal tourPendingStaffCost(UUID tourId) {
-    return nz(expenseRepository.sumPendingStaffByTour(tourId));
+    return nz(expenseMapper.sumPendingStaffByTour(tourId));
   }
 
   /** 团维度总成本预估 = 已付 + 上项待垫付。 */

@@ -1,4 +1,4 @@
-# 旅盈后端默认配置（本地开发）；生产请用环境变量覆盖密码与 JWT 密钥。
+# 旅盈后端：MyBatis + Druid 数据源
 server:
   port: 8080
 
@@ -6,24 +6,35 @@ spring:
   application:
     name: lvying-server
   datasource:
-    # 库名 lvying_dev；若库不存在可依赖 createDatabaseIfNotExist（需账号有建库权限）
+    type: com.alibaba.druid.pool.DruidDataSource
     url: jdbc:mysql://localhost:3306/lvying_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
     username: root
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      # 开发期自动建表/改表；上线建议改为 validate + Flyway
-      ddl-auto: update
-    show-sql: false
-    properties:
-      hibernate:
-        format_sql: true
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      test-while-idle: true
+      validation-query: SELECT 1
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.lvying.domain,com.lvying.mapper.dto
+  type-handlers-package: com.lvying.mybatis.handler
+  configuration:
+    map-underscore-to-camel-case: true
+    default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
 
 lvying:
   jwt:
-    # HS256 密钥，须足够长；生产务必 JWT_SECRET 环境变量覆盖
     secret: ${JWT_SECRET:lvying-dev-secret-change-me-min-32-chars-long!!}
     expiration-ms: 604800000
-  # 老板「可用余额」中额外扣减的安全垫（元），默认 0
   reserved-safe-cash: ${RESERVED_SAFE_CASH:0}

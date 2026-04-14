@@ -1,13 +1,13 @@
 package com.lvying.service;
 
 import com.lvying.domain.*;
-import com.lvying.repo.ExpenseRepository;
-import com.lvying.repo.TourRepository;
-import com.lvying.repo.UserRepository;
+import com.lvying.mapper.ExpenseMapper;
+import com.lvying.mapper.TourMapper;
+import com.lvying.mapper.UserMapper;
 import com.lvying.security.AppUserDetails;
 import com.lvying.web.dto.CreateExpenseRequest;
 import com.lvying.web.error.BusinessException;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,9 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExpenseService {
 
-  private final ExpenseRepository expenseRepository;
-  private final TourRepository tourRepository;
-  private final UserRepository userRepository;
+  private final ExpenseMapper expenseMapper;
+  private final TourMapper tourMapper;
+  private final UserMapper userMapper;
   private final FundService fundService;
 
   /**
@@ -35,8 +35,10 @@ public class ExpenseService {
    */
   @Transactional
   public void create(UUID tourId, CreateExpenseRequest req, AppUserDetails user) {
-    Tour tour =
-        tourRepository.findById(tourId).orElseThrow(() -> new BusinessException("NOT_FOUND", "团不存在"));
+    Tour tour = tourMapper.selectById(tourId);
+    if (tour == null) {
+      throw new BusinessException("NOT_FOUND", "团不存在");
+    }
     if (fundService.wouldExceedBudgetRedline(tourId, req.amount(), tour.getBudgetRedline())) {
       boolean bossOk =
           user.getRole() == UserRole.BOSS_FINANCE && Boolean.TRUE.equals(req.bossConfirmed());
@@ -49,26 +51,30 @@ public class ExpenseService {
       throw new BusinessException("VALIDATION", "员工垫付需选择垫付人");
     }
     boolean company = req.paymentMethod() == PaymentMethod.COMPANY_ACCOUNT;
-    User staff =
-        req.paymentMethod() == PaymentMethod.STAFF_ADVANCE
-            ? userRepository.getReferenceById(req.staffUserId())
-            : null;
-    User approver = company ? userRepository.getReferenceById(user.getId()) : null;
+    if (!company) {
+      if (userMapper.selectById(req.staffUserId()) == null) {
+        throw new BusinessException("VALIDATION", "垫付人不存在");
+      }
+    }
+    LocalDateTime now = LocalDateTime.now();
     Expense e =
         Expense.builder()
-            .tour(tour)
+            .id(UUID.randomUUID())
+            .tourId(tour.getId())
             .amount(req.amount())
             .category(req.category())
             .paymentMethod(req.paymentMethod())
-            .staffUser(staff)
+            .staffUserId(company ? null : req.staffUserId())
             .receiptImageUrl(req.receiptImageUrl())
             .note(req.note())
             .approvalStatus(
                 company ? ExpenseApprovalStatus.APPROVED : ExpenseApprovalStatus.PENDING)
             .payStatus(company ? ExpensePayStatus.PAID : ExpensePayStatus.UNPAID)
-            .approvedBy(approver)
-            .approvedAt(company ? Instant.now() : null)
+            .approvedById(company ? user.getId() : null)
+            .approvedAt(company ? now : null)
+            .createdAt(now)
+            .updatedAt(now)
             .build();
-    expenseRepository.save(e);
+    expenseMapper.insert(e);
   }
 }

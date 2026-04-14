@@ -1,13 +1,14 @@
 package com.lvying.service;
 
 import com.lvying.domain.*;
-import com.lvying.repo.ExpenseRepository;
-import com.lvying.repo.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
+import com.lvying.mapper.ExpenseMapper;
+import com.lvying.mapper.dto.ExpenseMonthExportRow;
+import com.lvying.mapper.dto.ExpensePendingRow;
+import com.lvying.web.error.BusinessException;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -21,32 +22,33 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReimbursementService {
 
-  private final ExpenseRepository expenseRepository;
-  private final UserRepository userRepository;
+  private final ExpenseMapper expenseMapper;
 
   /** 老板审批页：待付/待审的员工垫付，按团号与业务员折叠。 */
   @Transactional(readOnly = true)
   public List<PendingGroup> pendingByTour() {
-    List<Expense> list = expenseRepository.findPendingReimbursementForAggregation();
+    List<ExpensePendingRow> list = expenseMapper.selectPendingReimbursementForAggregation();
     record Key(UUID tourId, UUID staffId) {}
-    Map<Key, List<Expense>> map = new LinkedHashMap<>();
-    for (Expense e : list) {
-      Key k = new Key(e.getTour().getId(), e.getStaffUser().getId());
+    Map<Key, List<ExpensePendingRow>> map = new LinkedHashMap<>();
+    for (ExpensePendingRow e : list) {
+      Key k = new Key(e.getTourId(), e.getStaffUserId());
       map.computeIfAbsent(k, x -> new ArrayList<>()).add(e);
     }
     return map.entrySet().stream()
         .map(
             en -> {
-              List<Expense> lines = en.getValue();
-              Expense first = lines.get(0);
+              List<ExpensePendingRow> lines = en.getValue();
+              ExpensePendingRow first = lines.get(0);
               BigDecimal total =
-                  lines.stream().map(Expense::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                  lines.stream()
+                      .map(ExpensePendingRow::getAmount)
+                      .reduce(BigDecimal.ZERO, BigDecimal::add);
               return new PendingGroup(
-                  first.getTour().getId(),
-                  first.getTour().getTourCode(),
-                  first.getTour().getName(),
-                  first.getStaffUser().getId(),
-                  first.getStaffUser().getName(),
+                  first.getTourId(),
+                  first.getTourCode(),
+                  first.getTourName(),
+                  first.getStaffUserId(),
+                  first.getStaffName(),
                   total.toPlainString(),
                   lines.stream()
                       .map(
@@ -66,31 +68,35 @@ public class ReimbursementService {
   /** 单条通过：进入「已审未付」，计入全库 Pending_Cost直至财务打款。 */
   @Transactional
   public void approve(UUID expenseId, UUID approverId) {
-    Expense e =
-        expenseRepository
-            .findById(expenseId)
-            .orElseThrow(() -> new EntityNotFoundException("记录不存在"));
+    Expense e = expenseMapper.selectById(expenseId);
+    if (e == null) {
+      throw new BusinessException("NOT_FOUND", "记录不存在");
+    }
     if (e.getPaymentMethod() != PaymentMethod.STAFF_ADVANCE) {
       throw new IllegalArgumentException("非员工垫付");
     }
+    LocalDateTime now = LocalDateTime.now();
     e.setApprovalStatus(ExpenseApprovalStatus.APPROVED);
-    e.setApprovedBy(userRepository.getReferenceById(approverId));
-    e.setApprovedAt(Instant.now());
-    expenseRepository.save(e);
+    e.setApprovedById(approverId);
+    e.setApprovedAt(now);
+    e.setUpdatedAt(now);
+    expenseMapper.update(e);
   }
 
   /** 部分驳回：状态 {@link ExpenseApprovalStatus#PARTIAL_REJECT}，并写入备注。 */
   @Transactional
   public void partialReject(UUID expenseId, UUID approverId, String note) {
-    Expense e =
-        expenseRepository
-            .findById(expenseId)
-            .orElseThrow(() -> new EntityNotFoundException("记录不存在"));
+    Expense e = expenseMapper.selectById(expenseId);
+    if (e == null) {
+      throw new BusinessException("NOT_FOUND", "记录不存在");
+    }
+    LocalDateTime now = LocalDateTime.now();
     e.setApprovalStatus(ExpenseApprovalStatus.PARTIAL_REJECT);
-    e.setApprovedBy(userRepository.getReferenceById(approverId));
-    e.setApprovedAt(Instant.now());
+    e.setApprovedById(approverId);
+    e.setApprovedAt(now);
     e.setNote(note);
-    expenseRepository.save(e);
+    e.setUpdatedAt(now);
+    expenseMapper.update(e);
   }
 
   /**
@@ -100,24 +106,24 @@ public class ReimbursementService {
   public BatchExportResponse batchExport(int year, int month) {
     LocalDate start = LocalDate.of(year, month, 1);
     LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
-    ZoneId z = ZoneId.systemDefault();
-    Instant from = start.atStartOfDay(z).toInstant();
-    Instant to = end.plusDays(1).atStartOfDay(z).minusNanos(1).toInstant();
-    List<Expense> expenses = expenseRepository.findApprovedUnpaidStaffInRange(from, to);
+    LocalDateTime from = start.atStartOfDay();
+    LocalDateTime to = LocalDateTime.of(end, LocalTime.MAX);
+    List<ExpenseMonthExportRow> expenses =
+        expenseMapper.selectApprovedUnpaidStaffInRange(from, to);
     Map<UUID, Agg> byStaff = new LinkedHashMap<>();
-    for (Expense e : expenses) {
-      User u = e.getStaffUser();
+    for (ExpenseMonthExportRow row : expenses) {
+      UUID sid = row.getStaffUserId();
       byStaff
           .computeIfAbsent(
-              u.getId(),
+              sid,
               id ->
                   new Agg(
-                      u.getName(),
-                      u.getBankName() != null ? u.getBankName() : "",
-                      u.getBankAccountLast4() != null ? u.getBankAccountLast4() : "",
-                      u.getPhone(),
+                      row.getStaffName(),
+                      row.getBankName() != null ? row.getBankName() : "",
+                      row.getBankAccountLast4() != null ? row.getBankAccountLast4() : "",
+                      row.getPhone(),
                       BigDecimal.ZERO))
-          .add(e.getAmount());
+          .add(row.getAmount());
     }
     List<BatchExportResponse.Row> rows =
         byStaff.values().stream()
@@ -135,7 +141,15 @@ public class ReimbursementService {
         header
             + "\n"
             + rows.stream()
-                .map(r -> String.join(",", r.staffName(), r.totalAmount(), r.bankName(), r.accountLast4(), r.phone()))
+                .map(
+                    r ->
+                        String.join(
+                            ",",
+                            r.staffName(),
+                            r.totalAmount(),
+                            r.bankName(),
+                            r.accountLast4(),
+                            r.phone()))
                 .collect(Collectors.joining("\n"));
     return new BatchExportResponse(
         year + "-" + String.format("%02d", month), rows, csv);
@@ -144,15 +158,18 @@ public class ReimbursementService {
   /** 财务完成批量转账后，将对应报销单置为已付并记录批次号。 */
   @Transactional
   public void markBatchPaid(List<UUID> expenseIds, String batchRef) {
-    List<Expense> list = expenseRepository.findAllById(expenseIds);
-    for (Expense e : list) {
-      if (e.getApprovalStatus() == ExpenseApprovalStatus.APPROVED
+    LocalDateTime now = LocalDateTime.now();
+    for (UUID id : expenseIds) {
+      Expense e = expenseMapper.selectById(id);
+      if (e != null
+          && e.getApprovalStatus() == ExpenseApprovalStatus.APPROVED
           && e.getPayStatus() == ExpensePayStatus.UNPAID) {
         e.setPayStatus(ExpensePayStatus.PAID);
         e.setBatchPayRef(batchRef);
+        e.setUpdatedAt(now);
+        expenseMapper.update(e);
       }
     }
-    expenseRepository.saveAll(list);
   }
 
   /** 按团 + 垫付人聚合的审批视图。 */

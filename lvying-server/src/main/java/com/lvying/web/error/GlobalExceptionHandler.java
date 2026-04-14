@@ -1,6 +1,5 @@
 package com.lvying.web.error;
 
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -13,16 +12,20 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-  @ExceptionHandler(EntityNotFoundException.class)
-  public ResponseEntity<ErrorBody> notFound(EntityNotFoundException e) {
-    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .body(new ErrorBody("NOT_FOUND", e.getMessage()));
-  }
-
   @ExceptionHandler(BusinessException.class)
   public ResponseEntity<ErrorBody> business(BusinessException e) {
+    if ("NOT_FOUND".equals(e.getCode())) {
+      return ResponseEntity.status(HttpStatus.NOT_FOUND)
+          .body(new ErrorBody(e.getCode(), e.getMessage()));
+    }
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .body(new ErrorBody(e.getCode(), e.getMessage()));
+  }
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ErrorBody> badRequest(IllegalArgumentException e) {
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorBody("VALIDATION", e.getMessage()));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
