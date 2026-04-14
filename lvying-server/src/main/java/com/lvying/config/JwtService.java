@@ -1,6 +1,7 @@
 package com.lvying.config;
 
 import com.lvying.domain.UserRole;
+import com.lvying.util.UuidStrings;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -11,7 +12,8 @@ import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 
 /**
- * JWT签发与解析：subject 为用户 UUID，自定义 claims 含手机号与角色，供 {@link com.lvying.security.JwtAuthFilter} 还原登录态。
+ * JWT 签发与解析：subject 为用户 UUID（32 位无连字符），自定义 claims 含手机号与角色，供 {@link
+ * com.lvying.security.JwtAuthFilter} 还原登录态。
  */
 @Service
 public class JwtService {
@@ -36,7 +38,7 @@ public class JwtService {
     long exp = props.getJwt().getExpirationMs();
     Date now = new Date();
     return Jwts.builder()
-        .subject(userId.toString())
+        .subject(UuidStrings.compact(userId))
         .claim("phone", phone)
         .claim("role", role.name())
         .issuedAt(now)

@@ -21,10 +21,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * 安全栈：无 Session、JWT 过滤器、除登录外均需认证；CORS 放行本地前端开发端口。
+ * 安全栈：无 Session、JWT 过滤器、除登录外均需认证；CORS 放行本机与局域网前端开发地址（手机连 Wi‑Fi 调试）。
  *
  * <p>方法级权限使用 {@link org.springframework.security.access.prepost.PreAuthorize}（{@code hasRole} 与业务枚举 {@link
  * com.lvying.domain.UserRole} 对应，Spring 自动加 {@code ROLE_} 前缀）。
@@ -79,13 +78,36 @@ public class SecurityConfig {
 
   @Bean
   public CorsConfigurationSource cors() {
-    CorsConfiguration c = new CorsConfiguration();
-    c.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
-    c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    c.setAllowedHeaders(List.of("*"));
-    c.setAllowCredentials(true);
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", c);
-    return source;
+    return request -> {
+      String origin = request.getHeader("Origin");
+      CorsConfiguration c = new CorsConfiguration();
+      c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+      c.setAllowedHeaders(List.of("*"));
+      c.setAllowCredentials(true);
+      if (origin != null && isDevFrontendOrigin(origin)) {
+        c.setAllowedOrigins(List.of(origin));
+      }
+      return c;
+    };
+  }
+
+  /** 开发环境：本机与常见局域网网段（手机连同一 Wi‑Fi 访问电脑 IP:5173）。 */
+  private static boolean isDevFrontendOrigin(String origin) {
+    try {
+      var uri = java.net.URI.create(origin);
+      if (!"http".equalsIgnoreCase(uri.getScheme())) {
+        return false;
+      }
+      String host = uri.getHost();
+      if (host == null) {
+        return false;
+      }
+      return host.equals("localhost")
+          || host.equals("127.0.0.1")
+          || host.startsWith("192.168.")
+          || host.startsWith("10.");
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 }
