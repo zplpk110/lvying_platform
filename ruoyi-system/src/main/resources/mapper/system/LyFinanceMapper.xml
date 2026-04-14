@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.LyFinanceMapper">
+
+    <select id="selectBossDashboard" resultType="java.util.Map">
+        select
+            ifnull(sum(actual.actual_income), 0) as totalActualIncome,
+            ifnull(sum(cost.paid_cost), 0) as totalPaidCost,
+            ifnull(sum(cost.pending_cost), 0) as totalPendingCost,
+            (
+                ifnull(sum(actual.actual_income), 0) - ifnull(sum(cost.paid_cost), 0) - #{reserveFund}
+            ) as availableBalance,
+            (
+                ifnull(sum(actual.actual_income), 0) - ifnull(sum(cost.paid_cost + cost.pending_cost), 0)
+            ) as estimatedMonthlyProfit,
+            (
+                select count(1) from ly_tour_cost c where c.status = 'PENDING'
+            ) as pendingApprovalCount,
+            (
+                select count(1)
+                from ly_tour t2
+                left join (
+                    select tour_id, sum(amount) as actual_income
+                    from ly_tour_income
+                    group by tour_id
+                ) i2 on i2.tour_id = t2.tour_id
+                where t2.status in ('ONGOING', 'READY')
+                  and date_sub(t2.depart_date, interval 3 day) &lt;= curdate()
+                  and ifnull(i2.actual_income, 0) &lt; (t2.group_size * t2.unit_price)
+            ) as overdueFinalCount,
+            (
+                select count(1)
+                from ly_tour t3
+                left join (
+                    select tour_id,
+                           sum(case when status = 'PAID' then amount else 0 end) as paid_cost,
+                           sum(case when status = 'PENDING' then amount else 0 end) as pending_cost
+                    from ly_tour_cost
+                    group by tour_id
+                ) c3 on c3.tour_id = t3.tour_id
+                where t3.status in ('ONGOING', 'READY')
+                  and ifnull(c3.paid_cost, 0) + ifnull(c3.pending_cost, 0) &gt; t3.budget_limit
+            ) as grossWarningCount
+        from ly_tour t
+        left join (
+            select tour_id, sum(amount) as actual_income
+            from ly_tour_income
+            group by tour_id
+        ) actual on actual.tour_id = t.tour_id
+        left join (
+            select
+                tour_id,
+                sum(case when status = 'PAID' then amount else 0 end) as paid_cost,
+                sum(case when status = 'PENDING' then amount else 0 end) as pending_cost
+            from ly_tour_cost
+            group by tour_id
+        ) cost on cost.tour_id = t.tour_id
+    </select>
+
+    <select id="selectOngoingTourBoard" resultType="java.util.Map">
+        select
+            t.tour_id as tourId,
+            t.tour_no as tourNo,
+            t.tour_name as tourName,
+            t.depart_date as departDate,
+            concat(round(ifnull(income.actual_income, 0) / nullif((ifnull(cost.paid_cost, 0) + ifnull(cost.pending_cost, 0)), 0), 2), ':1') as incomeCostRatio,
+            ifnull(income.actual_income, 0) - ifnull(cost.paid_cost, 0) - ifnull(cost.pending_cost, 0) as estimatedProfit
+        from ly_tour t
+        left join (
+            select tour_id, sum(amount) as actual_income
+            from ly_tour_income
+            group by tour_id
+        ) income on income.tour_id = t.tour_id
+        left join (
+            select
+                tour_id,
+                sum(case when status = 'PAID' then amount else 0 end) as paid_cost,
+                sum(case when status = 'PENDING' then amount else 0 end) as pending_cost
+            from ly_tour_cost
+            group by tour_id
+        ) cost on cost.tour_id = t.tour_id
+        where t.status in ('ONGOING', 'READY')
+        order by t.depart_date asc
+    </select>
+
+    <select id="selectTourDetailById" parameterType="long" resultType="java.util.Map">
+        select
+            t.tour_id as tourId,
+            t.tour_no as tourNo,
+            t.tour_name as tourName,
+            t.status as status,
+            t.group_size as groupSize,
+            t.unit_price as unitPrice,
+            (t.group_size * t.unit_price) as totalReceivable,
+            t.budget_limit as budgetLimit,
+            t.sales_user_name as salesUserName
+        from ly_tour t
+        where t.tour_id = #{tourId}
+    </select>
+
+    <insert id="insertIncome" parameterType="java.util.Map">
+        insert into ly_tour_income(
+            tour_id, income_type, amount, received_time, remark, create_time
+        ) values (
+            #{tourId}, #{incomeType}, #{amount}, #{receivedTime}, #{remark}, sysdate()
+        )
+    </insert>
+
+    <insert id="insertCost" parameterType="java.util.Map">
+        insert into ly_tour_cost(
+            tour_id, category, amount, payment_method, advance_user_name, status, receipt_url, occur_date, remark, create_time
+        ) values (
+            #{tourId}, #{category}, #{amount}, #{paymentMethod}, #{advanceUserName}, #{status}, #{receiptUrl}, #{occurDate}, #{remark}, sysdate()
+        )
+    </insert>
+
+    <select id="selectPaidCostByTourId" parameterType="long" resultType="java.math.BigDecimal">
+        select ifnull(sum(amount), 0)
+        from ly_tour_cost
+        where tour_id = #{tourId}
+          and status = 'PAID'
+    </select>
+
+    <select id="selectPendingCostByTourId" parameterType="long" resultType="java.math.BigDecimal">
+        select ifnull(sum(amount), 0)
+        from ly_tour_cost
+        where tour_id = #{tourId}
+          and status = 'PENDING'
+    </select>
+
+    <select id="selectActualIncomeByTourId" parameterType="long" resultType="java.math.BigDecimal">
+        select ifnull(sum(amount), 0)
+        from ly_tour_income
+        where tour_id = #{tourId}
+    </select>
+
+    <select id="selectMyWallet" parameterType="string" resultType="java.util.Map">
+        select
+            c.cost_id as costId,
+            c.occur_date as occurDate,
+            t.tour_no as tourNo,
+            c.category as category,
+            c.amount as amount,
+            c.status as status
+        from ly_tour_cost c
+        left join ly_tour t on t.tour_id = c.tour_id
+        where c.advance_user_name = #{advanceUserName}
+        order by c.occur_date desc, c.cost_id desc
+    </select>
+
+    <select id="selectMyWalletPendingAmount" parameterType="string" resultType="java.math.BigDecimal">
+        select ifnull(sum(amount), 0)
+        from ly_tour_cost
+        where advance_user_name = #{advanceUserName}
+          and status = 'PENDING'
+    </select>
+
+    <select id="selectReimbursementApprovals" resultType="java.util.Map">
+        select
+            c.cost_id as costId,
+            t.tour_no as tourNo,
+            c.advance_user_name as advanceUserName,
+            c.category as category,
+            c.amount as amount,
+            c.status as status,
+            c.receipt_url as receiptUrl,
+            c.occur_date as occurDate
+        from ly_tour_cost c
+        left join ly_tour t on t.tour_id = c.tour_id
+        where c.payment_method = 'ADVANCE'
+          and c.status = 'PENDING'
+        order by c.occur_date asc, c.cost_id asc
+    </select>
+
+    <update id="updateReimbursementStatus" parameterType="java.util.Map">
+        update ly_tour_cost
+        set status = #{status},
+            approval_remark = #{approvalRemark},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where cost_id = #{costId}
+    </update>
+
+    <select id="selectOverdueReceivableTours" resultType="java.util.Map">
+        select
+            t.tour_id as tourId,
+            t.tour_no as tourNo,
+            t.tour_name as tourName,
+            t.sales_user_name as salesUserName,
+            t.customer_phone as customerPhone,
+            t.depart_date as departDate,
+            (t.group_size * t.unit_price) as totalReceivable,
+            ifnull(i.actual_income, 0) as actualIncome,
+            ((t.group_size * t.unit_price) - ifnull(i.actual_income, 0)) as finalReceivable
+        from ly_tour t
+        left join (
+            select tour_id, sum(amount) as actual_income
+            from ly_tour_income
+            group by tour_id
+        ) i on i.tour_id = t.tour_id
+        where t.status in ('READY', 'ONGOING')
+          and date_sub(t.depart_date, interval 3 day) &lt;= curdate()
+          and ifnull(i.actual_income, 0) &lt; (t.group_size * t.unit_price)
+        order by t.depart_date asc
+    </select>
+
+</mapper>
