@@ -3,25 +3,30 @@ package com.ruoyi.system.service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import com.ruoyi.system.domain.MvpGroup;
 
 public interface ILyFinanceService
 {
     Map<String, Object> getBossDashboard();
 
-    Map<String, Object> getTourDetail(Long tourId);
+    Map<String, Object> getTourDetail(Long groupId);
 
-    Map<String, Object> addIncome(Long tourId, BigDecimal amount, String incomeType, String remark);
+    MvpGroup openGroup(MvpGroup group);
 
-    Map<String, Object> addExpense(Long tourId, BigDecimal amount, String category, String paymentMethod,
-            String advanceUserName, String receiptUrl, String remark, boolean forceConfirm);
+    Map<String, Object> addIncome(Long groupId, BigDecimal amount, String bizType, Long customerId, String payerName,
+            String remark, String operator);
 
-    Map<String, Object> getMyWallet(String userName);
+    Map<String, Object> addExpense(Long groupId, BigDecimal amount, String bizType, Long advanceUserId, String receiptUrl,
+            String remark, String operator);
 
-    List<Map<String, Object>> getReimbursementApprovals();
+    Map<String, Object> getMyWallet(Long userId);
 
-    int approveReimbursement(Long costId, String remark, String operator);
+    List<Map<String, Object>> getAdvanceSummary(String settleMonth);
 
-    int rejectReimbursement(Long costId, String remark, String operator);
+    Map<String, Object> settleAdvance(Long userId, String settleMonth, BigDecimal paidAmount, Long operatorId,
+            String operatorName, String remark);
+
+    List<Map<String, Object>> getAdvanceSettlementList(String settleMonth);
 
     List<Map<String, Object>> getOverdueReceivableTours();
 }

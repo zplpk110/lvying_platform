@@ -4,32 +4,46 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.ibatis.annotations.Param;
+import com.ruoyi.system.domain.MvpFinanceRecord;
+import com.ruoyi.system.domain.MvpGroup;
 
 public interface LyFinanceMapper
 {
-    Map<String, Object> selectBossDashboard(@Param("reserveFund") BigDecimal reserveFund);
+    Map<String, Object> selectBossDashboard();
 
     List<Map<String, Object>> selectOngoingTourBoard();
 
-    Map<String, Object> selectTourDetailById(@Param("tourId") Long tourId);
+    Map<String, Object> selectTourDetailById(@Param("groupId") Long groupId);
 
-    int insertIncome(Map<String, Object> params);
+    BigDecimal selectGroupShouldReceivable(@Param("groupId") Long groupId);
 
-    int insertCost(Map<String, Object> params);
+    BigDecimal selectActualIncomeByGroupId(@Param("groupId") Long groupId);
 
-    BigDecimal selectPaidCostByTourId(@Param("tourId") Long tourId);
+    BigDecimal selectCostByGroupId(@Param("groupId") Long groupId);
 
-    BigDecimal selectPendingCostByTourId(@Param("tourId") Long tourId);
+    List<Map<String, Object>> selectGroupCustomers(@Param("groupId") Long groupId);
 
-    BigDecimal selectActualIncomeByTourId(@Param("tourId") Long tourId);
+    List<Map<String, Object>> selectGroupFinanceRecords(@Param("groupId") Long groupId);
 
-    List<Map<String, Object>> selectMyWallet(@Param("advanceUserName") String advanceUserName);
+    int insertGroup(MvpGroup group);
 
-    BigDecimal selectMyWalletPendingAmount(@Param("advanceUserName") String advanceUserName);
+    int insertFinanceRecord(MvpFinanceRecord record);
 
-    List<Map<String, Object>> selectReimbursementApprovals();
+    int updateCustomerPaidAmount(@Param("customerId") Long customerId, @Param("amount") BigDecimal amount);
 
-    int updateReimbursementStatus(Map<String, Object> params);
+    List<Map<String, Object>> selectMyWallet(@Param("userId") Long userId, @Param("settleMonth") String settleMonth);
+
+    BigDecimal selectMyWalletPendingAmount(@Param("userId") Long userId, @Param("settleMonth") String settleMonth);
+
+    List<Map<String, Object>> selectAdvanceSummaryByMonth(@Param("settleMonth") String settleMonth);
+
+    BigDecimal selectAdvanceTotalByUserMonth(@Param("userId") Long userId, @Param("settleMonth") String settleMonth);
+
+    BigDecimal selectSettledAmountByUserMonth(@Param("userId") Long userId, @Param("settleMonth") String settleMonth);
+
+    int insertAdvanceSettlement(Map<String, Object> params);
+
+    List<Map<String, Object>> selectAdvanceSettlementList(@Param("settleMonth") String settleMonth);
 
     List<Map<String, Object>> selectOverdueReceivableTours();
 }

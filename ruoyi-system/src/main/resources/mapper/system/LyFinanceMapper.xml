@@ -6,204 +6,303 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectBossDashboard" resultType="java.util.Map">
         select
-            ifnull(sum(actual.actual_income), 0) as totalActualIncome,
-            ifnull(sum(cost.paid_cost), 0) as totalPaidCost,
-            ifnull(sum(cost.pending_cost), 0) as totalPendingCost,
-            (
-                ifnull(sum(actual.actual_income), 0) - ifnull(sum(cost.paid_cost), 0) - #{reserveFund}
-            ) as availableBalance,
-            (
-                ifnull(sum(actual.actual_income), 0) - ifnull(sum(cost.paid_cost + cost.pending_cost), 0)
-            ) as estimatedMonthlyProfit,
-            (
-                select count(1) from ly_tour_cost c where c.status = 'PENDING'
-            ) as pendingApprovalCount,
+            ifnull(sum(r.income_amount), 0) as totalActualIncome,
+            ifnull(sum(r.cost_amount), 0) as totalCost,
+            ifnull(sum(r.income_amount), 0) - ifnull(sum(r.cost_amount), 0) as estimatedProfit,
             (
                 select count(1)
-                from ly_tour t2
-                left join (
-                    select tour_id, sum(amount) as actual_income
-                    from ly_tour_income
-                    group by tour_id
-                ) i2 on i2.tour_id = t2.tour_id
-                where t2.status in ('ONGOING', 'READY')
-                  and date_sub(t2.depart_date, interval 3 day) &lt;= curdate()
-                  and ifnull(i2.actual_income, 0) &lt; (t2.group_size * t2.unit_price)
-            ) as overdueFinalCount,
+                from mvp_group_customer gc
+                where gc.payment_status in (0, 1)
+                  and gc.final_due_date &lt;= date_add(curdate(), interval 1 day)
+            ) as unpaidCustomerCount,
             (
-                select count(1)
-                from ly_tour t3
-                left join (
-                    select tour_id,
-                           sum(case when status = 'PAID' then amount else 0 end) as paid_cost,
-                           sum(case when status = 'PENDING' then amount else 0 end) as pending_cost
-                    from ly_tour_cost
-                    group by tour_id
-                ) c3 on c3.tour_id = t3.tour_id
-                where t3.status in ('ONGOING', 'READY')
-                  and ifnull(c3.paid_cost, 0) + ifnull(c3.pending_cost, 0) &gt; t3.budget_limit
-            ) as grossWarningCount
-        from ly_tour t
-        left join (
-            select tour_id, sum(amount) as actual_income
-            from ly_tour_income
-            group by tour_id
-        ) actual on actual.tour_id = t.tour_id
+                select ifnull(sum(gc.should_pay - gc.paid_amount), 0)
+                from mvp_group_customer gc
+                where gc.payment_status in (0, 1)
+                  and gc.final_due_date &lt;= date_add(curdate(), interval 1 day)
+            ) as unpaidCustomerAmount,
+            (
+                select
+                    greatest(
+                        ifnull(sum(case when fr.record_type = 2 and fr.status = 1 and fr.advance_user_id is not null
+                            then fr.amount else 0 end), 0)
+                        - ifnull((select sum(s.paid_amount)
+                            from mvp_advance_settlement s
+                            where s.settle_month = date_format(curdate(), '%Y-%m')), 0),
+                        0
+                    )
+                from mvp_finance_record fr
+                where date_format(fr.occur_date, '%Y-%m') = date_format(curdate(), '%Y-%m')
+            ) as staffAdvanceAmount,
+            (
+                select
+                    greatest(
+                        ifnull(sum(case when fr.record_type = 2 and fr.status = 1 and fr.advance_user_id is not null
+                            then fr.amount else 0 end), 0)
+                        - ifnull((select sum(s.paid_amount) from mvp_advance_settlement s), 0),
+                        0
+                    )
+                from mvp_finance_record fr
+            ) as staffAdvanceAmountTotal
+        from mvp_group g
         left join (
             select
-                tour_id,
-                sum(case when status = 'PAID' then amount else 0 end) as paid_cost,
-                sum(case when status = 'PENDING' then amount else 0 end) as pending_cost
-            from ly_tour_cost
-            group by tour_id
-        ) cost on cost.tour_id = t.tour_id
+                group_id,
+                sum(case when record_type = 1 and status = 1 then amount else 0 end) as income_amount,
+                sum(case when record_type = 2 and status = 1 then amount else 0 end) as cost_amount
+            from mvp_finance_record
+            group by group_id
+        ) r on r.group_id = g.id
+        where g.status = 1
     </select>
 
     <select id="selectOngoingTourBoard" resultType="java.util.Map">
         select
-            t.tour_id as tourId,
-            t.tour_no as tourNo,
-            t.tour_name as tourName,
-            t.depart_date as departDate,
-            concat(round(ifnull(income.actual_income, 0) / nullif((ifnull(cost.paid_cost, 0) + ifnull(cost.pending_cost, 0)), 0), 2), ':1') as incomeCostRatio,
-            ifnull(income.actual_income, 0) - ifnull(cost.paid_cost, 0) - ifnull(cost.pending_cost, 0) as estimatedProfit
-        from ly_tour t
-        left join (
-            select tour_id, sum(amount) as actual_income
-            from ly_tour_income
-            group by tour_id
-        ) income on income.tour_id = t.tour_id
+            g.id as groupId,
+            g.group_name as groupName,
+            g.depart_date as departDate,
+            g.people_count as peopleCount,
+            g.budget_cost as budgetCost,
+            ifnull(r.income_amount, 0) as actualIncome,
+            ifnull(r.cost_amount, 0) as totalCost,
+            ifnull(r.income_amount, 0) - ifnull(r.cost_amount, 0) as estimatedProfit,
+            case
+                when ifnull(r.cost_amount, 0) &gt;= g.budget_cost then 2
+                when ifnull(r.cost_amount, 0) &gt;= g.budget_cost * 0.9 then 1
+                else 0
+            end as budgetWarnLevel
+        from mvp_group g
         left join (
             select
-                tour_id,
-                sum(case when status = 'PAID' then amount else 0 end) as paid_cost,
-                sum(case when status = 'PENDING' then amount else 0 end) as pending_cost
-            from ly_tour_cost
-            group by tour_id
-        ) cost on cost.tour_id = t.tour_id
-        where t.status in ('ONGOING', 'READY')
-        order by t.depart_date asc
+                group_id,
+                sum(case when record_type = 1 and status = 1 then amount else 0 end) as income_amount,
+                sum(case when record_type = 2 and status = 1 then amount else 0 end) as cost_amount
+            from mvp_finance_record
+            group by group_id
+        ) r on r.group_id = g.id
+        where g.status = 1
+        order by g.depart_date asc
     </select>
 
     <select id="selectTourDetailById" parameterType="long" resultType="java.util.Map">
         select
-            t.tour_id as tourId,
-            t.tour_no as tourNo,
-            t.tour_name as tourName,
-            t.status as status,
-            t.group_size as groupSize,
-            t.unit_price as unitPrice,
-            (t.group_size * t.unit_price) as totalReceivable,
-            t.budget_limit as budgetLimit,
-            t.sales_user_name as salesUserName
-        from ly_tour t
-        where t.tour_id = #{tourId}
+            g.id as groupId,
+            g.group_name as groupName,
+            g.status as status,
+            g.depart_date as departDate,
+            g.return_date as returnDate,
+            g.people_count as peopleCount,
+            g.price_mode as priceMode,
+            g.unit_price as unitPrice,
+            g.total_price as totalPrice,
+            g.budget_cost as budgetCost
+        from mvp_group g
+        where g.id = #{groupId}
     </select>
 
-    <insert id="insertIncome" parameterType="java.util.Map">
-        insert into ly_tour_income(
-            tour_id, income_type, amount, received_time, remark, create_time
+    <select id="selectGroupShouldReceivable" parameterType="long" resultType="java.math.BigDecimal">
+        select ifnull(sum(should_pay), 0)
+        from mvp_group_customer
+        where group_id = #{groupId}
+    </select>
+
+    <select id="selectActualIncomeByGroupId" parameterType="long" resultType="java.math.BigDecimal">
+        select ifnull(sum(amount), 0)
+        from mvp_finance_record
+        where group_id = #{groupId}
+          and record_type = 1
+          and status = 1
+    </select>
+
+    <select id="selectCostByGroupId" parameterType="long" resultType="java.math.BigDecimal">
+        select ifnull(sum(amount), 0)
+        from mvp_finance_record
+        where group_id = #{groupId}
+          and record_type = 2
+          and status = 1
+    </select>
+
+    <select id="selectGroupCustomers" parameterType="long" resultType="java.util.Map">
+        select
+            gc.id as customerId,
+            gc.customer_name as customerName,
+            gc.phone as phone,
+            gc.should_pay as shouldPay,
+            gc.paid_amount as paidAmount,
+            gc.payment_status as paymentStatus,
+            gc.final_due_date as finalDueDate,
+            (gc.should_pay - gc.paid_amount) as unpaidAmount
+        from mvp_group_customer gc
+        where gc.group_id = #{groupId}
+        order by gc.id asc
+    </select>
+
+    <select id="selectGroupFinanceRecords" parameterType="long" resultType="java.util.Map">
+        select
+            fr.id as recordId,
+            fr.record_type as recordType,
+            fr.biz_type as bizType,
+            fr.amount as amount,
+            fr.occur_date as occurDate,
+            fr.payer_name as payerName,
+            fr.advance_user_id as advanceUserId,
+            fr.status as status,
+            fr.voucher_url as voucherUrl,
+            fr.remark as remark
+        from mvp_finance_record fr
+        where fr.group_id = #{groupId}
+        order by fr.occur_date desc, fr.id desc
+    </select>
+
+    <insert id="insertGroup" parameterType="com.ruoyi.system.domain.MvpGroup" useGeneratedKeys="true" keyProperty="id">
+        insert into mvp_group(
+            group_name, depart_date, return_date, people_count, price_mode, unit_price, total_price,
+            budget_cost, status, remark, create_by, create_time
         ) values (
-            #{tourId}, #{incomeType}, #{amount}, #{receivedTime}, #{remark}, sysdate()
+            #{groupName}, #{departDate}, #{returnDate}, #{peopleCount}, #{priceMode}, #{unitPrice}, #{totalPrice},
+            #{budgetCost}, #{status}, #{remark}, #{createBy}, now()
         )
     </insert>
 
-    <insert id="insertCost" parameterType="java.util.Map">
-        insert into ly_tour_cost(
-            tour_id, category, amount, payment_method, advance_user_name, status, receipt_url, occur_date, remark, create_time
+    <insert id="insertFinanceRecord" parameterType="com.ruoyi.system.domain.MvpFinanceRecord" useGeneratedKeys="true" keyProperty="id">
+        insert into mvp_finance_record(
+            group_id, customer_id, record_type, biz_type, amount, occur_date, payer_name, advance_user_id,
+            voucher_url, ocr_amount, status, remark, create_by, create_time
         ) values (
-            #{tourId}, #{category}, #{amount}, #{paymentMethod}, #{advanceUserName}, #{status}, #{receiptUrl}, #{occurDate}, #{remark}, sysdate()
+            #{groupId}, #{customerId}, #{recordType}, #{bizType}, #{amount}, #{occurDate}, #{payerName}, #{advanceUserId},
+            #{voucherUrl}, #{ocrAmount}, #{status}, #{remark}, #{createBy}, now()
         )
     </insert>
 
-    <select id="selectPaidCostByTourId" parameterType="long" resultType="java.math.BigDecimal">
-        select ifnull(sum(amount), 0)
-        from ly_tour_cost
-        where tour_id = #{tourId}
-          and status = 'PAID'
-    </select>
-
-    <select id="selectPendingCostByTourId" parameterType="long" resultType="java.math.BigDecimal">
-        select ifnull(sum(amount), 0)
-        from ly_tour_cost
-        where tour_id = #{tourId}
-          and status = 'PENDING'
-    </select>
-
-    <select id="selectActualIncomeByTourId" parameterType="long" resultType="java.math.BigDecimal">
-        select ifnull(sum(amount), 0)
-        from ly_tour_income
-        where tour_id = #{tourId}
-    </select>
-
-    <select id="selectMyWallet" parameterType="string" resultType="java.util.Map">
-        select
-            c.cost_id as costId,
-            c.occur_date as occurDate,
-            t.tour_no as tourNo,
-            c.category as category,
-            c.amount as amount,
-            c.status as status
-        from ly_tour_cost c
-        left join ly_tour t on t.tour_id = c.tour_id
-        where c.advance_user_name = #{advanceUserName}
-        order by c.occur_date desc, c.cost_id desc
-    </select>
-
-    <select id="selectMyWalletPendingAmount" parameterType="string" resultType="java.math.BigDecimal">
-        select ifnull(sum(amount), 0)
-        from ly_tour_cost
-        where advance_user_name = #{advanceUserName}
-          and status = 'PENDING'
-    </select>
-
-    <select id="selectReimbursementApprovals" resultType="java.util.Map">
-        select
-            c.cost_id as costId,
-            t.tour_no as tourNo,
-            c.advance_user_name as advanceUserName,
-            c.category as category,
-            c.amount as amount,
-            c.status as status,
-            c.receipt_url as receiptUrl,
-            c.occur_date as occurDate
-        from ly_tour_cost c
-        left join ly_tour t on t.tour_id = c.tour_id
-        where c.payment_method = 'ADVANCE'
-          and c.status = 'PENDING'
-        order by c.occur_date asc, c.cost_id asc
-    </select>
-
-    <update id="updateReimbursementStatus" parameterType="java.util.Map">
-        update ly_tour_cost
-        set status = #{status},
-            approval_remark = #{approvalRemark},
-            update_by = #{updateBy},
-            update_time = sysdate()
-        where cost_id = #{costId}
+    <update id="updateCustomerPaidAmount">
+        update mvp_group_customer
+        set paid_amount = ifnull(paid_amount, 0) + #{amount},
+            payment_status = case
+                when ifnull(paid_amount, 0) + #{amount} &gt;= should_pay then 2
+                when ifnull(paid_amount, 0) + #{amount} &gt; 0 then 1
+                else 0
+            end,
+            update_time = now()
+        where id = #{customerId}
     </update>
+
+    <select id="selectMyWallet" resultType="java.util.Map">
+        select
+            fr.id as recordId,
+            fr.group_id as groupId,
+            g.group_name as groupName,
+            fr.biz_type as bizType,
+            fr.amount as amount,
+            fr.occur_date as occurDate,
+            fr.status as status
+        from mvp_finance_record fr
+        left join mvp_group g on g.id = fr.group_id
+        where fr.record_type = 2
+          and fr.status = 1
+          and fr.advance_user_id = #{userId}
+          and date_format(fr.occur_date, '%Y-%m') = #{settleMonth}
+        order by fr.occur_date desc, fr.id desc
+    </select>
+
+    <select id="selectMyWalletPendingAmount" resultType="java.math.BigDecimal">
+        select
+            greatest(
+                ifnull(sum(fr.amount), 0) - ifnull((
+                    select sum(s2.paid_amount)
+                    from mvp_advance_settlement s2
+                    where s2.user_id = #{userId}
+                      and s2.settle_month = #{settleMonth}
+                ), 0),
+                0
+            )
+        from mvp_finance_record fr
+        where fr.record_type = 2
+          and fr.status = 1
+          and fr.advance_user_id = #{userId}
+          and date_format(fr.occur_date, '%Y-%m') = #{settleMonth}
+    </select>
+
+    <select id="selectAdvanceSummaryByMonth" resultType="java.util.Map">
+        select
+            fr.advance_user_id as userId,
+            ifnull(u.nick_name, u.user_name) as userName,
+            ifnull(sum(fr.amount), 0) as totalAdvance,
+            ifnull(s.settledAmount, 0) as settledAmount,
+            greatest(ifnull(sum(fr.amount), 0) - ifnull(s.settledAmount, 0), 0) as leftAmount
+        from mvp_finance_record fr
+        left join sys_user u on u.user_id = fr.advance_user_id
+        left join (
+            select user_id, ifnull(sum(paid_amount), 0) as settledAmount
+            from mvp_advance_settlement
+            where settle_month = #{settleMonth}
+            group by user_id
+        ) s on s.user_id = fr.advance_user_id
+        where fr.record_type = 2
+          and fr.status = 1
+          and fr.advance_user_id is not null
+          and date_format(fr.occur_date, '%Y-%m') = #{settleMonth}
+        group by fr.advance_user_id, u.nick_name, u.user_name, s.settledAmount
+        order by leftAmount desc, totalAdvance desc
+    </select>
+
+    <select id="selectAdvanceTotalByUserMonth" resultType="java.math.BigDecimal">
+        select ifnull(sum(fr.amount), 0)
+        from mvp_finance_record fr
+        where fr.record_type = 2
+          and fr.status = 1
+          and fr.advance_user_id = #{userId}
+          and date_format(fr.occur_date, '%Y-%m') = #{settleMonth}
+    </select>
+
+    <select id="selectSettledAmountByUserMonth" resultType="java.math.BigDecimal">
+        select ifnull(sum(paid_amount), 0)
+        from mvp_advance_settlement
+        where user_id = #{userId}
+          and settle_month = #{settleMonth}
+    </select>
+
+    <insert id="insertAdvanceSettlement" parameterType="java.util.Map">
+        insert into mvp_advance_settlement(
+            settle_month, user_id, total_advance, paid_amount, left_amount, status, settle_time, operator_id,
+            snapshot_json, remark, create_by, create_time
+        ) values (
+            #{settleMonth}, #{userId}, #{totalAdvance}, #{paidAmount}, #{leftAmount}, #{status}, now(), #{operatorId},
+            #{snapshotJson}, #{remark}, #{createBy}, now()
+        )
+    </insert>
+
+    <select id="selectAdvanceSettlementList" resultType="java.util.Map">
+        select
+            s.id as settlementId,
+            s.settle_month as settleMonth,
+            s.user_id as userId,
+            ifnull(u.nick_name, u.user_name) as userName,
+            s.total_advance as totalAdvance,
+            s.paid_amount as paidAmount,
+            s.left_amount as leftAmount,
+            s.status as status,
+            s.settle_time as settleTime,
+            s.remark as remark
+        from mvp_advance_settlement s
+        left join sys_user u on u.user_id = s.user_id
+        where s.settle_month = #{settleMonth}
+        order by s.settle_time desc, s.id desc
+    </select>
 
     <select id="selectOverdueReceivableTours" resultType="java.util.Map">
         select
-            t.tour_id as tourId,
-            t.tour_no as tourNo,
-            t.tour_name as tourName,
-            t.sales_user_name as salesUserName,
-            t.customer_phone as customerPhone,
-            t.depart_date as departDate,
-            (t.group_size * t.unit_price) as totalReceivable,
-            ifnull(i.actual_income, 0) as actualIncome,
-            ((t.group_size * t.unit_price) - ifnull(i.actual_income, 0)) as finalReceivable
-        from ly_tour t
-        left join (
-            select tour_id, sum(amount) as actual_income
-            from ly_tour_income
-            group by tour_id
-        ) i on i.tour_id = t.tour_id
-        where t.status in ('READY', 'ONGOING')
-          and date_sub(t.depart_date, interval 3 day) &lt;= curdate()
-          and ifnull(i.actual_income, 0) &lt; (t.group_size * t.unit_price)
-        order by t.depart_date asc
+            g.id as groupId,
+            g.group_name as groupName,
+            g.depart_date as departDate,
+            count(1) as unpaidCount,
+            ifnull(sum(gc.should_pay - gc.paid_amount), 0) as unpaidAmount
+        from mvp_group_customer gc
+        inner join mvp_group g on g.id = gc.group_id
+        where gc.payment_status in (0, 1)
+          and gc.final_due_date &lt;= date_add(curdate(), interval 1 day)
+          and g.status = 1
+        group by g.id, g.group_name, g.depart_date
+        order by g.depart_date asc
     </select>
 
 </mapper>
