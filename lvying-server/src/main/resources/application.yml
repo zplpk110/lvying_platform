@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: lvying-server
+  datasource:
+    url: jdbc:mysql://localhost:3306/lvying_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+    username: root
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+lvying:
+  jwt:
+    secret: ${JWT_SECRET:lvying-dev-secret-change-me-min-32-chars-long!!}
+    expiration-ms: 604800000
+  reserved-safe-cash: ${RESERVED_SAFE_CASH:0}
