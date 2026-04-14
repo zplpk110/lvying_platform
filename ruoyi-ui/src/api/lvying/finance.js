@@ -7,57 +7,34 @@ export function getDashboardOverview() {
   })
 }
 
-export function getTourDetail(tourId) {
+export function openGroup(data) {
   return request({
-    url: '/lvying/tour/' + tourId + '/detail',
-    method: 'get'
-  })
-}
-
-export function addTourIncome(tourId, data) {
-  return request({
-    url: '/lvying/tour/' + tourId + '/income',
+    url: '/lvying/group/open',
     method: 'post',
     data: data
   })
 }
 
-export function addTourExpense(tourId, data, forceConfirm) {
+export function getGroupDetail(groupId) {
   return request({
-    url: '/lvying/tour/' + tourId + '/expense',
+    url: '/lvying/group/' + groupId + '/detail',
+    method: 'get'
+  })
+}
+
+export function addGroupIncome(groupId, data) {
+  return request({
+    url: '/lvying/group/' + groupId + '/income',
     method: 'post',
-    params: { forceConfirm: !!forceConfirm },
     data: data
   })
 }
 
-export function getMyWallet() {
+export function addGroupCost(groupId, data) {
   return request({
-    url: '/lvying/reimbursement/my-wallet',
-    method: 'get'
-  })
-}
-
-export function getReimbursementApprovals() {
-  return request({
-    url: '/lvying/reimbursement/approvals',
-    method: 'get'
-  })
-}
-
-export function approveReimbursement(costId, remark) {
-  return request({
-    url: '/lvying/reimbursement/' + costId + '/approve',
+    url: '/lvying/group/' + groupId + '/cost',
     method: 'post',
-    data: { remark: remark }
-  })
-}
-
-export function rejectReimbursement(costId, remark) {
-  return request({
-    url: '/lvying/reimbursement/' + costId + '/reject',
-    method: 'post',
-    data: { remark: remark }
+    data: data
   })
 }
 
@@ -68,9 +45,33 @@ export function getOverdueList() {
   })
 }
 
-export function sendBatchReminder() {
+export function getMyWallet() {
   return request({
-    url: '/lvying/collection/send-batch',
-    method: 'post'
+    url: '/lvying/wallet/me',
+    method: 'get'
+  })
+}
+
+export function getAdvanceSummary(settleMonth) {
+  return request({
+    url: '/lvying/advance/summary',
+    method: 'get',
+    params: { settleMonth }
+  })
+}
+
+export function settleAdvance(data) {
+  return request({
+    url: '/lvying/advance/settle',
+    method: 'post',
+    data: data
+  })
+}
+
+export function getAdvanceSettlementList(settleMonth) {
+  return request({
+    url: '/lvying/advance/settlement/list',
+    method: 'get',
+    params: { settleMonth }
   })
 }
